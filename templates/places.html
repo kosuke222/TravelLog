@@ -1,0 +1,405 @@
+{% extends "base.html" %}
+
+{% block head %}
+  {% if google_maps_api_key %}
+    <script>
+      function initPlacesSearch() {
+        const run = () => {
+          const input = document.getElementById("place-search-input");
+          const mapEl = document.getElementById("place-map");
+          const listMapEl = document.getElementById("places-map");
+          const mapPanel = document.getElementById("place-map-panel");
+          const mapClose = document.getElementById("place-map-close");
+          if (!input || !mapEl || !window.google || !google.maps || !google.maps.places) {
+            return;
+          }
+
+          const autocomplete = new google.maps.places.Autocomplete(input, {
+            fields: [
+              "place_id",
+              "name",
+              "formatted_address",
+              "geometry",
+              "photos",
+              "types",
+              "rating",
+              "user_ratings_total",
+              "website",
+              "formatted_phone_number",
+              "url",
+              "opening_hours",
+            ],
+          });
+
+          const map = new google.maps.Map(mapEl, {
+            center: { lat: 35.6804, lng: 139.769 },
+            zoom: 12,
+          });
+
+          const marker = new google.maps.Marker({ map });
+
+          autocomplete.addListener("place_changed", () => {
+            const place = autocomplete.getPlace();
+            if (!place.geometry || !place.geometry.location) {
+              return;
+            }
+
+            map.setCenter(place.geometry.location);
+            map.setZoom(16);
+            marker.setPosition(place.geometry.location);
+
+            document.getElementById("name").value = place.name || "";
+            document.getElementById("address").value = place.formatted_address || "";
+            document.getElementById("place_id").value = place.place_id || "";
+            document.getElementById("lat").value = place.geometry.location.lat();
+            document.getElementById("lng").value = place.geometry.location.lng();
+
+            const previewImg = document.getElementById("place-photo-preview");
+            const previewMore = document.getElementById("place-photo-more");
+            const previewCount = document.getElementById("place-photo-count");
+            let photoUrl = "";
+            let photoUrls = [];
+            if (place.photos && place.photos.length > 0) {
+              photoUrls = place.photos.slice(0, 6).map((photo) =>
+                photo.getUrl({ maxWidth: 600, maxHeight: 400 })
+              );
+              photoUrl = photoUrls[0] || "";
+              previewImg.src = photoUrl;
+              previewImg.classList.remove("is-hidden");
+              if (photoUrls.length > 1) {
+                previewCount.textContent = String(photoUrls.length);
+                previewMore.dataset.photos = JSON.stringify(photoUrls);
+                previewMore.classList.remove("is-hidden");
+              } else {
+                previewMore.classList.add("is-hidden");
+              }
+            } else {
+              previewImg.classList.add("is-hidden");
+              previewMore.classList.add("is-hidden");
+            }
+            document.getElementById("photo_url").value = photoUrl;
+            document.getElementById("photo_urls").value = JSON.stringify(photoUrls);
+
+            document.getElementById("rating").value = place.rating || "";
+            document.getElementById("user_ratings_total").value = place.user_ratings_total || "";
+            document.getElementById("website").value = place.website || "";
+            document.getElementById("phone").value = place.formatted_phone_number || "";
+            document.getElementById("google_url").value = place.url || "";
+            const hours = place.opening_hours && place.opening_hours.weekday_text
+              ? place.opening_hours.weekday_text.join("\n")
+              : "";
+            document.getElementById("opening_hours").value = hours;
+
+            const categorySelect = document.getElementById("category");
+            const types = place.types || [];
+            const typeSet = new Set(types);
+            let mapped = "その他";
+            if (typeSet.has("restaurant")) mapped = "レストラン";
+            if (typeSet.has("cafe")) mapped = "カフェ";
+            if (typeSet.has("bar") || typeSet.has("night_club")) mapped = "バー";
+            if (typeSet.has("liquor_store") || typeSet.has("meal_takeaway")) mapped = "居酒屋";
+            if (typeSet.has("park") || typeSet.has("museum") || typeSet.has("tourist_attraction")) {
+              mapped = "スポット";
+            }
+            categorySelect.value = mapped;
+          });
+
+          let listMap = null;
+          let listMarker = null;
+          let infoWindow = null;
+
+          if (listMapEl && mapPanel) {
+            listMap = new google.maps.Map(listMapEl, {
+              center: { lat: 35.6804, lng: 139.769 },
+              zoom: 12,
+            });
+            listMarker = new google.maps.Marker({ map: listMap });
+            infoWindow = new google.maps.InfoWindow();
+
+            const cards = Array.from(document.querySelectorAll(".place-card"));
+            cards.forEach((card) => {
+              const lat = parseFloat(card.dataset.lat || "");
+              const lng = parseFloat(card.dataset.lng || "");
+              if (Number.isNaN(lat) || Number.isNaN(lng)) {
+                return;
+              }
+              const position = { lat, lng };
+              const showInfo = () => {
+                const title = card.dataset.name || "行きたい場所";
+                const address = card.dataset.address || "";
+                const rating = card.dataset.rating ? `評価 ${card.dataset.rating}` : "";
+                const url = card.dataset.googleUrl || "";
+                const content = `
+                  <div style="font-family: 'Space Grotesk', sans-serif;">
+                    <strong>${title}</strong><br />
+                    ${address ? `<div>${address}</div>` : ""}
+                    ${rating ? `<div>${rating}</div>` : ""}
+                    ${url ? `<a href="${url}" target="_blank" rel="noopener">Googleマップで開く</a>` : ""}
+                  </div>
+                `;
+                infoWindow.setContent(content);
+                infoWindow.open(listMap, listMarker);
+              };
+              card.addEventListener("click", (event) => {
+                if (event.target.closest("a, button, form")) {
+                  return;
+                }
+                if (mapPanel.parentElement !== card.parentElement) {
+                  card.parentElement.insertBefore(mapPanel, card);
+                } else if (mapPanel.nextElementSibling !== card) {
+                  card.parentElement.insertBefore(mapPanel, card);
+                }
+                mapPanel.classList.add("is-visible");
+                listMap.setCenter(position);
+                listMap.setZoom(16);
+                listMarker.setPosition(position);
+                setTimeout(() => {
+                  google.maps.event.trigger(listMap, "resize");
+                  listMap.setCenter(position);
+                }, 200);
+                showInfo();
+              });
+            });
+
+            if (mapClose) {
+              mapClose.addEventListener("click", () => {
+                mapPanel.classList.remove("is-visible");
+                if (infoWindow) {
+                  infoWindow.close();
+                }
+              });
+            }
+          }
+
+        };
+
+        if (document.readyState === "loading") {
+          document.addEventListener("DOMContentLoaded", run, { once: true });
+        } else {
+          run();
+        }
+      }
+    </script>
+    <script
+      src="https://maps.googleapis.com/maps/api/js?key={{ google_maps_api_key }}&libraries=places&callback=initPlacesSearch"
+      async
+      defer
+    ></script>
+  {% endif %}
+{% endblock %}
+
+{% block content %}
+  <section class="page-header">
+    <div>
+      <p class="eyebrow">Places</p>
+      <h1>行きたいところリスト</h1>
+      <p class="lead">Googleマップから検索して、そのまま保存できます。</p>
+    </div>
+  </section>
+
+  <section class="tabs">
+    <a class="tab {% if active_category == 'all' %}active{% endif %}" href="{{ url_for('places', category='all') }}">すべて</a>
+    {% for cat in categories %}
+      <a class="tab {% if active_category == cat %}active{% endif %}" href="{{ url_for('places', category=cat) }}">{{ cat }}</a>
+    {% endfor %}
+  </section>
+
+  <section class="panel form-panel is-collapsed" id="place-form-panel">
+    <form method="post" class="form-grid" enctype="multipart/form-data" id="place-form">
+      <div>
+        <label for="place-search-input">場所を検索</label>
+        <input id="place-search-input" type="text" placeholder="例: 渋谷カフェ" autocomplete="off" />
+        {% if not google_maps_api_key %}
+          <p class="meta">Google Maps APIキーが未設定です。</p>
+        {% endif %}
+      </div>
+      <div>
+        <label for="name">スポット名</label>
+        <input id="name" name="name" type="text" />
+      </div>
+      <div>
+        <label for="address">住所</label>
+        <input id="address" name="address" type="text" />
+      </div>
+      <div>
+        <label for="category">カテゴリ</label>
+        <select id="category" name="category">
+          {% for cat in categories %}
+            <option value="{{ cat }}">{{ cat }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label for="notes">メモ</label>
+        <textarea id="notes" name="notes" placeholder="雰囲気、予算、行きたい理由など"></textarea>
+      </div>
+      <div>
+        <label>マッププレビュー</label>
+        <div id="place-map" class="map-preview"></div>
+      </div>
+      <div>
+        <label>写真プレビュー</label>
+        <div class="preview-row">
+          <img id="place-photo-preview" class="place-photo preview is-hidden" alt="プレビュー" />
+          <button type="button" id="place-photo-more" class="preview-more is-hidden">
+            <span>+</span>
+            <span id="place-photo-count">0</span>
+          </button>
+        </div>
+      </div>
+      <div>
+        <label for="photos">写真（追加アップロード）</label>
+        <input id="photos" name="photos" type="file" accept="image/*" multiple />
+      </div>
+
+      <input type="hidden" id="place_id" name="place_id" />
+      <input type="hidden" id="lat" name="lat" />
+      <input type="hidden" id="lng" name="lng" />
+      <input type="hidden" id="photo_url" name="photo_url" />
+      <input type="hidden" id="photo_urls" name="photo_urls" />
+      <input type="hidden" id="rating" name="rating" />
+      <input type="hidden" id="user_ratings_total" name="user_ratings_total" />
+      <input type="hidden" id="website" name="website" />
+      <input type="hidden" id="phone" name="phone" />
+      <input type="hidden" id="google_url" name="google_url" />
+      <input type="hidden" id="opening_hours" name="opening_hours" />
+
+      <button class="button primary" type="submit">追加する</button>
+    </form>
+  </section>
+
+  <section class="panel">
+    <div class="panel-header">
+      <strong>リスト</strong>
+      <button class="button primary" type="button" id="place-form-toggle">追加フォームを開く</button>
+    </div>
+    <ul class="item-list">
+      <li id="place-map-panel" class="map-panel">
+        <div class="map-header">
+          <strong>マップ</strong>
+          <button class="button ghost map-close" type="button" id="place-map-close">閉じる</button>
+        </div>
+        <div id="places-map" class="map-preview"></div>
+      </li>
+      {% for place in places %}
+        <li class="item-row place-card"
+            data-lat="{{ place['lat'] or '' }}"
+            data-lng="{{ place['lng'] or '' }}"
+            data-name="{{ place['name'] }}"
+            data-address="{{ place['address'] or '' }}"
+            data-rating="{{ place['rating'] or '' }}"
+            data-google-url="{{ place['google_url'] or '' }}">
+          <div class="item-main">
+            <strong>{{ place["name"] }}</strong>
+            <span class="meta">{{ place["category_display"] }} ・ {{ place["created_at"] }}</span>
+            {% if place["address"] %}
+              <div class="meta">{{ place["address"] }}</div>
+            {% endif %}
+            {% if place["rating"] %}
+              <div class="meta">評価 {{ place["rating"] }}（{{ place["user_ratings_total"] or 0 }}）</div>
+            {% endif %}
+            {% if place["opening_hours"] %}
+              <button type="button" class="button ghost hours-toggle">営業時間を見る</button>
+              <div class="note is-hidden hours-details">{{ place["opening_hours"] }}</div>
+            {% endif %}
+            {% if place["notes"] %}
+              <p class="note">{{ place["notes"] }}</p>
+            {% endif %}
+            {% set photos = photos_by_place.get(place["id"], []) %}
+            {% if photos %}
+              <div class="photo-shell">
+                <div class="photo-scroller">
+                  {% for url in photos %}
+                    <img class="place-photo" src="{{ url }}" alt="{{ place['name'] }}" />
+                  {% endfor %}
+                </div>
+              </div>
+            {% endif %}
+          </div>
+          <div class="item-actions">
+            {% if place["google_url"] %}
+              <a class="button ghost" href="{{ place['google_url'] }}" target="_blank" rel="noopener">地図</a>
+            {% endif %}
+            <a class="button ghost" href="{{ url_for('places_edit', place_id=place['id']) }}">編集</a>
+            <form method="post" action="{{ url_for('places_delete', place_id=place['id']) }}">
+              <button class="button danger" type="submit">削除</button>
+            </form>
+          </div>
+        </li>
+      {% else %}
+        <li class="item-row empty-state">まだ登録がありません。</li>
+      {% endfor %}
+    </ul>
+  </section>
+
+  <div id="photo-modal" class="photo-modal is-hidden" role="dialog" aria-modal="true">
+    <div class="photo-modal-card">
+      <div class="photo-modal-header">
+        <strong>写真一覧</strong>
+        <button type="button" class="button ghost" id="photo-modal-close">閉じる</button>
+      </div>
+      <div class="photo-modal-body photo-shell">
+        <div class="photo-scroller" id="photo-modal-scroller"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      const formToggle = document.getElementById("place-form-toggle");
+      const formPanel = document.getElementById("place-form-panel");
+      if (formToggle && formPanel) {
+        formToggle.addEventListener("click", () => {
+          const isHidden = formPanel.classList.toggle("is-collapsed");
+          formToggle.textContent = isHidden ? "追加フォームを開く" : "追加フォームを閉じる";
+          if (!isHidden) {
+            formPanel.scrollIntoView({ behavior: "smooth", block: "start" });
+          }
+        });
+      }
+
+      const hourButtons = document.querySelectorAll(".hours-toggle");
+      hourButtons.forEach((button) => {
+        button.addEventListener("click", () => {
+          const details = button.closest(".item-main")?.querySelector(".hours-details");
+          if (!details) return;
+          const isHidden = details.classList.toggle("is-hidden");
+          button.textContent = isHidden ? "営業時間を見る" : "営業時間を隠す";
+        });
+      });
+
+      const modal = document.getElementById("photo-modal");
+      const modalClose = document.getElementById("photo-modal-close");
+      const modalScroller = document.getElementById("photo-modal-scroller");
+      const previewMore = document.getElementById("place-photo-more");
+      if (previewMore && modal && modalClose && modalScroller) {
+        previewMore.addEventListener("click", () => {
+          const list = previewMore.dataset.photos || "[]";
+          let urls = [];
+          try {
+            urls = JSON.parse(list);
+          } catch (e) {
+            urls = [];
+          }
+          modalScroller.innerHTML = "";
+          urls.forEach((url) => {
+            const img = document.createElement("img");
+            img.className = "place-photo preview";
+            img.src = url;
+            img.alt = "プレビュー";
+            modalScroller.appendChild(img);
+          });
+          modal.classList.remove("is-hidden");
+        });
+        modalClose.addEventListener("click", () => {
+          modal.classList.add("is-hidden");
+        });
+        modal.addEventListener("click", (event) => {
+          if (event.target === modal) {
+            modal.classList.add("is-hidden");
+          }
+        });
+      }
+    });
+  </script>
+{% endblock %}

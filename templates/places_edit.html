@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <section class="page-header">
+    <div>
+      <p class="eyebrow">Edit</p>
+      <h1>行きたい場所を編集</h1>
+      <p class="lead">内容と写真を更新できます。</p>
+    </div>
+  </section>
+
+  <section class="panel form-panel">
+    <form method="post" action="{{ url_for('places_update', place_id=place['id']) }}" class="form-grid" enctype="multipart/form-data">
+      <div>
+        <label for="name">場所</label>
+        <input id="name" name="name" type="text" value="{{ place['name'] }}" />
+      </div>
+      <div>
+        <label for="address">住所</label>
+        <input id="address" name="address" type="text" value="{{ place['address'] or '' }}" />
+      </div>
+      <div>
+        <label for="category">カテゴリ</label>
+        <select id="category" name="category" required>
+          {% for cat in categories %}
+            <option value="{{ cat }}" {% if place['category'] == cat %}selected{% endif %}>{{ cat }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label for="notes">メモ</label>
+        <textarea id="notes" name="notes">{{ place['notes'] or '' }}</textarea>
+      </div>
+      <div>
+        <label for="photos">写真（追加アップロード）</label>
+        <input id="photos" name="photos" type="file" accept="image/*" multiple />
+        {% if place["photo_url"] or photos %}
+          <div class="photo-shell">
+            <div class="photo-scroller">
+              {% if place["photo_url"] %}
+                <img class="place-photo preview" src="{{ place['photo_url'] }}" alt="{{ place['name'] }}" />
+              {% endif %}
+              {% for photo in photos %}
+                <img class="place-photo preview" src="{{ photo['photo_url'] }}" alt="{{ place['name'] }}" />
+              {% endfor %}
+            </div>
+          </div>
+        {% endif %}
+      </div>
+
+      <input type="hidden" id="place_id" name="place_id" value="{{ place['place_id'] or '' }}" />
+      <input type="hidden" id="lat" name="lat" value="{{ place['lat'] or '' }}" />
+      <input type="hidden" id="lng" name="lng" value="{{ place['lng'] or '' }}" />
+      <input type="hidden" id="photo_url" name="photo_url" value="{{ place['photo_url'] or '' }}" />
+      <input type="hidden" id="photo_urls" name="photo_urls" />
+      <input type="hidden" id="rating" name="rating" value="{{ place['rating'] or '' }}" />
+      <input type="hidden" id="user_ratings_total" name="user_ratings_total" value="{{ place['user_ratings_total'] or '' }}" />
+      <input type="hidden" id="website" name="website" value="{{ place['website'] or '' }}" />
+      <input type="hidden" id="phone" name="phone" value="{{ place['phone'] or '' }}" />
+      <input type="hidden" id="google_url" name="google_url" value="{{ place['google_url'] or '' }}" />
+      <input type="hidden" id="opening_hours" name="opening_hours" value="{{ place['opening_hours'] or '' }}" />
+
+      <div class="inline-actions">
+        <button class="button primary" type="submit">更新する</button>
+        <a class="button ghost" href="{{ url_for('places', category='all') }}">戻る</a>
+      </div>
+    </form>
+  </section>
+{% endblock %}

@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <section class="page-header">
+    <div>
+      <p class="eyebrow">Memo</p>
+      <h1>メモ帳</h1>
+      <p class="lead">タブを作って、自由に書き留める。</p>
+    </div>
+  </section>
+
+  <section class="tabs">
+    <a class="tab {% if active_tab == 'all' %}active{% endif %}" href="{{ url_for('memo', tab='all') }}">すべて</a>
+    {% for tab in tabs %}
+      <a class="tab {% if active_tab == tab %}active{% endif %}" href="{{ url_for('memo', tab=tab) }}">{{ tab }}</a>
+    {% endfor %}
+  </section>
+
+  <section class="panel form-panel">
+    <form method="post" class="form-grid">
+      <div>
+        <label for="tab_name">タブ名</label>
+        <input id="tab_name" name="tab_name" type="text" placeholder="例: 旅行 / 勉強" />
+      </div>
+      <div>
+        <label for="body">メモ</label>
+        <textarea id="body" name="body" placeholder="自由に書き留める" required></textarea>
+      </div>
+      <button class="button primary" type="submit">保存する</button>
+    </form>
+  </section>
+
+  <section class="grid">
+    {% for memo in memos %}
+      <article class="panel memo-card memo-toggle">
+        <div class="card-header">
+          <h2>{{ memo["tab_name"] }}</h2>
+          <span class="meta">{{ memo["created_at"] }}</span>
+        </div>
+        <div class="memo-preview">{{ memo["body"][:80] }}{% if memo["body"]|length > 80 %}...{% endif %}</div>
+        <div class="memo-body is-hidden">{{ memo["body"] }}</div>
+        <form method="post" action="{{ url_for('memo_delete', memo_id=memo['id']) }}">
+          <button class="button danger" type="submit">削除</button>
+        </form>
+      </article>
+    {% else %}
+      <article class="panel empty-state">
+        <p>まだメモがありません。</p>
+      </article>
+    {% endfor %}
+  </section>
+
+  <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      const cards = document.querySelectorAll(".memo-toggle");
+      cards.forEach((card) => {
+        card.addEventListener("click", (event) => {
+          if (event.target.closest("button, form, a")) {
+            return;
+          }
+          const body = card.querySelector(".memo-body");
+          if (!body) return;
+          body.classList.toggle("is-hidden");
+        });
+      });
+    });
+  </script>
+{% endblock %}

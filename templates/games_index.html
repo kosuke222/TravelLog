@@ -1,0 +1,35 @@
+﻿{% extends "base.html" %}
+
+{% block content %}
+  <section class="page-header">
+    <div>
+      <p class="eyebrow">Games</p>
+      <h1>自作ゲーム一覧</h1>
+      <p class="lead">気軽に楽しめるミニゲームのまとめページ。</p>
+    </div>
+  </section>
+
+  <section class="grid">
+    <article class="panel">
+      <h2>準備中</h2>
+      <p>もうすぐ追加予定のミニゲーム。</p>
+      <span class="meta">制作中</span>
+    </article>
+    <article class="panel">
+      <h2>準備中</h2>
+      <p>もうすぐ追加予定のミニゲーム。</p>
+      <span class="meta">制作中</span>
+    </article>
+  </section>
+
+  <section class="grid">
+    <a class="panel card-link" href="{{ url_for('games_memo') }}">
+      <h2>ゲームメモ</h2>
+      <p>やりたいゲームやアイデアを書き留める。</p>
+    </a>
+    <a class="panel card-link" href="{{ url_for('games_lottery') }}">
+      <h2>くじ引き</h2>
+      <p>入力した項目をランダムに表示。</p>
+    </a>
+  </section>
+{% endblock %}

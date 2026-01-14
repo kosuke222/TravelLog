@@ -1,117 +1,829 @@
-/* style.css */
+@import url("https://fonts.googleapis.com/css2?family=Fraunces:wght@400;600;700&family=Space+Grotesk:wght@400;500;600&display=swap");
 
-/* 全体の基本設定 */
+:root {
+  --bg: #f4efe6;
+  --bg-deep: #e7dcc9;
+  --ink: #1f1f1f;
+  --muted: #5a534a;
+  --accent: #ff6f3d;
+  --accent-deep: #e0562a;
+  --card: #fff8f0;
+  --outline: #c8b8a2;
+  --shadow: rgba(26, 18, 8, 0.12);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
 body {
-    font-family: Arial, sans-serif;
-    margin: 0;
-    padding: 0;
-    background-color: #f4f4f4;
-    color: #333;
+  margin: 0;
+  font-family: "Space Grotesk", sans-serif;
+  color: var(--ink);
+  background: radial-gradient(circle at top left, #ffe9d6 0%, var(--bg) 45%, #efe7da 100%);
+  min-height: 100vh;
+  overflow-x: hidden;
 }
 
-/* h1 (ログイン成功画面などで使用) */
-h1 {
-    text-align: center;
-    margin-top: 20px;
-    color: #555;
+html,
+body {
+  width: 100%;
+  max-width: 100%;
 }
 
-/* ログインフォームのコンテナ */
-#login-form {
-    max-width: 400px;
-    margin: 50px auto;
-    padding: 20px;
-    background: #fff;
-    border-radius: 5px;
-    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+.bg-orbit {
+  position: fixed;
+  inset: 0;
+  background: radial-gradient(circle at 80% 20%, rgba(255, 111, 61, 0.18), transparent 45%),
+    radial-gradient(circle at 10% 70%, rgba(91, 139, 116, 0.18), transparent 50%);
+  z-index: -1;
 }
 
-/* ログインフォーム内の見出し */
-#login-form h2 {
-    text-align: center;
-    margin-bottom: 20px;
-    color: #333;
+.site-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 24px 8vw;
+  gap: 12px;
+  flex-wrap: nowrap;
+  flex-direction: column;
+  text-align: center;
 }
 
-/* ログインフォームのレイアウト */
-#login-form form {
-    display: flex;
+.logo {
+  font-family: "Fraunces", serif;
+  font-weight: 700;
+  font-size: 1.9rem;
+  letter-spacing: 0.03em;
+}
+
+.nav {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+  width: 100%;
+}
+
+.nav a {
+  margin-left: 0;
+  text-decoration: none;
+  color: var(--ink);
+  font-weight: 600;
+  padding: 8px 4px;
+  border-radius: 14px;
+  border: 1px solid var(--outline);
+  background: rgba(255, 255, 255, 0.9);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  text-align: center;
+  white-space: nowrap;
+  line-height: 1.1;
+  font-size: 0.8rem;
+  min-height: 44px;
+}
+
+.nav a:hover {
+  background: #fff;
+  box-shadow: 0 10px 20px rgba(31, 31, 31, 0.12);
+}
+
+.nav a:active {
+  transform: translateY(1px);
+}
+
+.nav a.active,
+.nav a[aria-current="page"] {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+  box-shadow: 0 12px 24px rgba(255, 111, 61, 0.25);
+}
+
+.nav a:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 16px rgba(31, 31, 31, 0.12);
+}
+
+.page {
+  padding: 24px 8vw 80px;
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+}
+
+.site-footer {
+  padding: 16px 8vw 32px;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.hero {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 32px;
+  align-items: center;
+}
+
+/* Page load reveal */
+.page > * {
+  animation: fadeUp 0.6s ease both;
+}
+
+.page > *:nth-child(2) {
+  animation-delay: 0.05s;
+}
+
+.page > *:nth-child(3) {
+  animation-delay: 0.1s;
+}
+
+.page > *:nth-child(4) {
+  animation-delay: 0.15s;
+}
+
+.grid > * {
+  animation: fadeUp 0.6s ease both;
+}
+
+.grid > *:nth-child(2) {
+  animation-delay: 0.06s;
+}
+
+.grid > *:nth-child(3) {
+  animation-delay: 0.12s;
+}
+
+.grid > *:nth-child(4) {
+  animation-delay: 0.18s;
+}
+
+.hero h1 {
+  font-family: "Fraunces", serif;
+  font-size: clamp(2rem, 3vw, 3rem);
+  margin: 8px 0 12px;
+}
+
+.eyebrow {
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  font-size: 0.7rem;
+  color: var(--muted);
+  margin: 0;
+}
+
+.lead {
+  color: var(--muted);
+  font-size: 1rem;
+  line-height: 1.6;
+}
+
+.hero-card {
+  background: linear-gradient(160deg, #fff7ec 0%, #ffe8d2 100%);
+  border: 1px solid rgba(200, 184, 162, 0.6);
+  border-radius: 20px;
+  padding: 20px;
+  box-shadow: 0 12px 30px var(--shadow);
+}
+
+.hero-card-top {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 16px;
+}
+
+.hero-card-top strong {
+  font-size: 1.2rem;
+}
+
+.hero-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 10px;
+  color: var(--muted);
+}
+
+.cta-row {
+  margin-top: 18px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+}
+
+.button {
+  border: none;
+  border-radius: 999px;
+  padding: 12px 20px;
+  cursor: pointer;
+  font-weight: 600;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 20px rgba(31, 31, 31, 0.15);
+}
+
+.button.primary {
+  background: var(--accent);
+  color: #fff;
+}
+
+.button.ghost {
+  background: transparent;
+  border: 1px solid var(--outline);
+  color: var(--ink);
+}
+
+.button.danger {
+  background: #ffb3a3;
+  color: #5b1e12;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 20px;
+}
+
+.panel {
+  background: var(--card);
+  border: 1px solid var(--outline);
+  border-radius: 18px;
+  padding: 20px;
+  box-shadow: 0 10px 26px var(--shadow);
+}
+
+.panel h2 {
+  font-family: "Fraunces", serif;
+  margin-top: 0;
+}
+
+.panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.card-link {
+  text-decoration: none;
+  color: inherit;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  position: relative;
+  overflow: hidden;
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+
+.card-link::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at top left, rgba(255, 111, 61, 0.18), transparent 55%);
+  opacity: 0;
+  transition: opacity 0.25s ease;
+}
+
+.card-link:hover {
+  transform: translateY(-6px);
+  box-shadow: 0 16px 36px rgba(31, 31, 31, 0.18);
+}
+
+.card-link:hover::after {
+  opacity: 1;
+}
+
+.link-arrow {
+  text-decoration: none;
+  color: var(--accent-deep);
+  font-weight: 600;
+}
+
+.card-meta {
+  font-size: 0.75rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.schedule-card {
+  grid-column: 1 / -1;
+  gap: 10px;
+}
+
+.schedule-meta {
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.schedule-date {
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.schedule-title {
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.schedule-snippet {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.icon-card {
+  align-items: stretch;
+  text-align: center;
+  gap: 12px;
+}
+
+.icon-card h2 {
+  margin: 0;
+}
+
+.card-icon {
+  width: 100%;
+  height: 140px;
+  border-radius: 18px;
+  background: rgba(255, 111, 61, 0.15);
+  border: 1px solid rgba(200, 184, 162, 0.75);
+  display: block;
+  overflow: hidden;
+}
+
+.card-icon img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.page-header h1 {
+  font-family: "Fraunces", serif;
+  margin: 8px 0 0;
+}
+
+.form-panel {
+  padding: 24px;
+}
+
+.form-grid {
+  display: grid;
+  gap: 14px;
+}
+
+.form-grid > * {
+  min-width: 0;
+}
+
+.form-grid input,
+.form-grid textarea,
+.form-grid select {
+  width: 100%;
+  border-radius: 12px;
+  border: 1px solid var(--outline);
+  padding: 10px 12px;
+  font-family: inherit;
+  background: #fff;
+}
+
+.form-grid textarea {
+  min-height: 140px;
+  resize: vertical;
+}
+
+.memo-card .card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+}
+
+.meta {
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.memo-body {
+  white-space: pre-wrap;
+  color: var(--muted);
+}
+
+.memo-preview {
+  color: var(--muted);
+  margin: 8px 0 0;
+}
+
+.memo-toggle {
+  cursor: pointer;
+}
+
+.tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.tab {
+  padding: 8px 16px;
+  border-radius: 999px;
+  border: 1px solid var(--outline);
+  text-decoration: none;
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.tab.active {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+
+.item-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 12px;
+  max-width: 100%;
+}
+
+.item-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 14px 12px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.6);
+  border: 1px solid rgba(200, 184, 162, 0.5);
+  width: 100%;
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.place-card {
+  cursor: pointer;
+}
+
+.item-main {
+  flex: 1;
+  min-width: 0;
+  width: 100%;
+}
+
+.item-main strong {
+  display: block;
+  word-break: break-word;
+}
+
+.meta {
+  word-break: break-word;
+}
+
+.item-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.photo-shell {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-bottom: 6px;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-x;
+}
+
+.photo-scroller {
+  margin-top: 10px;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  scroll-snap-type: x mandatory;
+  width: max-content;
+}
+
+.photo-shell::-webkit-scrollbar {
+  height: 6px;
+}
+
+.photo-shell::-webkit-scrollbar-thumb {
+  background: rgba(90, 83, 74, 0.4);
+  border-radius: 999px;
+}
+
+.map-preview {
+  width: 100%;
+  height: 220px;
+  border-radius: 12px;
+  border: 1px solid var(--outline);
+  background: #fff;
+}
+
+.map-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.map-panel {
+  list-style: none;
+  margin: 0;
+  padding: 16px;
+  opacity: 0;
+  max-height: 0;
+  overflow: hidden;
+  transform: translateY(6px);
+  transition: opacity 0.25s ease, max-height 0.3s ease, transform 0.25s ease;
+  pointer-events: none;
+  background: var(--card);
+  border: 1px solid var(--outline);
+  border-radius: 18px;
+  box-shadow: 0 10px 26px var(--shadow);
+}
+
+.map-panel.is-visible {
+  opacity: 1;
+  max-height: 360px;
+  transform: translateY(0);
+  pointer-events: auto;
+  margin-bottom: 12px;
+}
+
+.map-close {
+  min-height: 36px;
+  padding: 6px 14px;
+}
+
+.is-hidden {
+  display: none;
+}
+
+.is-collapsed {
+  display: none;
+}
+
+.place-photo {
+  border-radius: 12px;
+  background: #fff;
+  border: 1px solid rgba(200, 184, 162, 0.6);
+  object-fit: cover;
+  flex-shrink: 0;
+  scroll-snap-align: start;
+}
+
+.place-photo.preview {
+  width: 220px;
+  height: 140px;
+}
+
+.preview-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.preview-more {
+  border: 1px dashed var(--outline);
+  border-radius: 14px;
+  background: transparent;
+  color: var(--ink);
+  padding: 12px 14px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+
+.photo-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(31, 31, 31, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  z-index: 40;
+}
+
+.photo-modal.is-hidden {
+  display: none;
+}
+
+.photo-modal-card {
+  width: min(520px, 92vw);
+  background: var(--card);
+  border: 1px solid var(--outline);
+  border-radius: 18px;
+  padding: 16px;
+  box-shadow: 0 12px 30px var(--shadow);
+}
+
+.photo-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.photo-modal-body {
+  max-height: 60vh;
+}
+
+.note {
+  margin: 6px 0 0;
+  color: var(--muted);
+  white-space: pre-wrap;
+}
+
+.empty-state {
+  text-align: center;
+  color: var(--muted);
+}
+
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 18px;
+  flex-wrap: wrap;
+}
+
+.section-title h2 {
+  font-family: "Fraunces", serif;
+  font-size: clamp(1.8rem, 2.6vw, 2.6rem);
+  margin: 0;
+}
+
+.section-title {
+  margin-bottom: -8px;
+}
+
+.page-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.lottery-actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-top: 14px;
+  flex-wrap: wrap;
+}
+
+.lottery-result {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: rgba(255, 111, 61, 0.15);
+  border: 1px solid rgba(255, 111, 61, 0.3);
+}
+
+.inline-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.filter-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+.filter-row label {
+  font-weight: 600;
+}
+
+@media (max-width: 720px) {
+  .site-header,
+  .page,
+  .site-footer {
+    max-width: 480px;
+    margin: 0 auto;
+  }
+
+  .site-header,
+  .page,
+  .site-footer {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
+  .site-header {
     flex-direction: column;
+    gap: 10px;
+  }
+
+  .nav {
+    width: 100%;
+  }
+
+  .logo {
+    font-size: 1.5rem;
+  }
+
+  .nav a {
+    font-size: 0.78rem;
+    padding: 8px 4px;
+  }
+
+  .item-row {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .item-actions {
+    flex-wrap: wrap;
+  }
+
+  .place-photo {
+    height: 160px;
+    max-width: 80vw;
+  }
+
+  .cta-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .button,
+  .tab {
+    min-height: 48px;
+  }
+
+  .page {
+    padding-top: 20px;
+    padding-bottom: 80px;
+  }
 }
 
-/* ログインフォームのラベル */
-#login-form label {
-    margin-bottom: 5px;
-    color: #333;
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
-/* ログインフォームの入力フィールドとボタンの共通スタイル */
-#login-form input[type="text"],
-#login-form input[type="password"],
-#login-form input[type="submit"],
-#login-form input[type="checkbox"], /* チェックボックスは今回は使用しないが、汎用性を考慮して残す */
-#login-form button { /* 登録ボタンなどで使用 */
-    margin-bottom: 10px;
-    padding: 10px;
-    font-size: 16px;
-    border: 1px solid #ccc;
-    border-radius: 3px;
+/* =========================================
+   写真プレビュー専用のスクロールエリア
+   （form の「写真プレビュー」だけに適用）
+   ========================================= */
+#place-photo-preview-list {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-bottom: 6px;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-x;
+  height: 160px;
+  min-height: 160px;
+  max-height: 160px;
 }
 
-/* フォームの送信ボタンと通常のボタンのスタイル */
-#login-form input[type="submit"],
-#login-form button {
-    background-color: #007bff; /* 青色 */
-    color: #fff;
-    cursor: pointer;
-    border: none;
+#place-photo-preview-scroller {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-top: 10px;
+  width: max-content;
+  height: 140px;
 }
 
-/* ホバー時のスタイル */
-#login-form input[type="submit"]:hover,
-#login-form button:hover {
-    background-color: #0056b3; /* 濃い青色 */
-}
-
-/* ログイン成功画面用のスタイル (login_success.htmlでh1とp要素が使われる想定) */
-/* このスタイルはlogin_success.htmlの<style>タグに直接記述しても良いが、一元管理のためにここに置く */
-/* login_success.htmlのスタイルは以前の回答でより詳細に設定されているため、
-   もしそちらを優先したい場合は、そのCSSを直接login_success.htmlに貼り付けてください。
-   ここでは、汎用的なh1と、シンプルさを保つため、追加のスタイルは控えめにしておきます。
-   もしlogin_success.htmlのデザインをもっと凝りたい場合は、そのHTMLファイル内に<style>ブロックを追加するか、
-   専用のCSSクラスをここで定義してください。
-*/
-.login-success-container {
-    max-width: 400px;
-    margin: 50px auto;
-    padding: 20px;
-    background: #fff;
-    border-radius: 5px;
-    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-    text-align: center; /* 中央揃え */
-}
-.login-success-container h1 {
-    color: #28a745; /* 緑色 */
-    margin-bottom: 20px;
-}
-.login-success-container p {
-    font-size: 1.1em;
-}
-.login-success-container a {
-    display: block;
-    margin-top: 30px;
-    color: #007bff;
-    text-decoration: none;
-    font-weight: bold;
-}
-.login-success-container a:hover {
-    text-decoration: underline;
-}
-
-/* 水平線（区切り線） */
-hr {
-    border: none;
-    border-top: 1px solid #ddd;
-    margin: 20px auto;
-    width: 80%;
+#place-photo-preview-scroller img {
+  flex: 0 0 auto;
+  width: 220px;
+  height: 140px;
+  border-radius: 12px;
+  object-fit: cover;
+  background: #fff;
+  border: 1px solid rgba(200, 184, 162, 0.6);
+  scroll-snap-align: start;
 }

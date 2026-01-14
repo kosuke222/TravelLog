@@ -1,0 +1,417 @@
+{% extends "base.html" %}
+
+{% block head %}
+  {% if google_maps_api_key %}
+    <script>
+      function initScheduleSearch() {
+        const run = () => {
+          const input = document.getElementById("schedule-search-input");
+          const mapEl = document.getElementById("schedule-map");
+          const listMapEl = document.getElementById("schedule-list-map");
+          const mapPanel = document.getElementById("schedule-map-panel");
+          const mapClose = document.getElementById("schedule-map-close");
+          if (!input || !mapEl || !window.google || !google.maps || !google.maps.places) {
+            return;
+          }
+
+          const autocomplete = new google.maps.places.Autocomplete(input, {
+            fields: [
+              "place_id",
+              "name",
+              "formatted_address",
+              "geometry",
+              "photos",
+              "types",
+              "rating",
+              "user_ratings_total",
+              "website",
+              "formatted_phone_number",
+              "url",
+              "opening_hours",
+            ],
+          });
+
+          const map = new google.maps.Map(mapEl, {
+            center: { lat: 35.6804, lng: 139.769 },
+            zoom: 12,
+          });
+
+          const marker = new google.maps.Marker({ map });
+
+          autocomplete.addListener("place_changed", () => {
+            const place = autocomplete.getPlace();
+            if (!place.geometry || !place.geometry.location) {
+              return;
+            }
+
+            map.setCenter(place.geometry.location);
+            map.setZoom(16);
+            marker.setPosition(place.geometry.location);
+
+            document.getElementById("address").value = place.formatted_address || "";
+            document.getElementById("place_id").value = place.place_id || "";
+            document.getElementById("lat").value = place.geometry.location.lat();
+            document.getElementById("lng").value = place.geometry.location.lng();
+
+            const previewImg = document.getElementById("schedule-photo-preview");
+            const previewMore = document.getElementById("schedule-photo-more");
+            const previewCount = document.getElementById("schedule-photo-count");
+            let photoUrl = "";
+            let photoUrls = [];
+            if (place.photos && place.photos.length > 0) {
+              photoUrls = place.photos.slice(0, 6).map((photo) =>
+                photo.getUrl({ maxWidth: 600, maxHeight: 400 })
+              );
+              photoUrl = photoUrls[0] || "";
+              previewImg.src = photoUrl;
+              previewImg.classList.remove("is-hidden");
+              if (photoUrls.length > 1) {
+                previewCount.textContent = String(photoUrls.length);
+                previewMore.dataset.photos = JSON.stringify(photoUrls);
+                previewMore.classList.remove("is-hidden");
+              } else {
+                previewMore.classList.add("is-hidden");
+              }
+            } else {
+              previewImg.classList.add("is-hidden");
+              previewMore.classList.add("is-hidden");
+            }
+            document.getElementById("photo_url").value = photoUrl;
+            document.getElementById("photo_urls").value = JSON.stringify(photoUrls);
+
+            document.getElementById("rating").value = place.rating || "";
+            document.getElementById("user_ratings_total").value = place.user_ratings_total || "";
+            document.getElementById("website").value = place.website || "";
+            document.getElementById("phone").value = place.formatted_phone_number || "";
+            document.getElementById("google_url").value = place.url || "";
+            const hours = place.opening_hours && place.opening_hours.weekday_text
+              ? place.opening_hours.weekday_text.join("\n")
+              : "";
+            document.getElementById("opening_hours").value = hours;
+          });
+
+          if (listMapEl && mapPanel) {
+            const listMap = new google.maps.Map(listMapEl, {
+              center: { lat: 35.6804, lng: 139.769 },
+              zoom: 12,
+            });
+            const listMarker = new google.maps.Marker({ map: listMap });
+            const infoWindow = new google.maps.InfoWindow();
+
+            const cards = Array.from(document.querySelectorAll(".schedule-card"));
+            cards.forEach((card) => {
+              const lat = parseFloat(card.dataset.lat || "");
+              const lng = parseFloat(card.dataset.lng || "");
+              if (Number.isNaN(lat) || Number.isNaN(lng)) {
+                return;
+              }
+              const position = { lat, lng };
+              const showInfo = () => {
+                const title = card.dataset.title || "予定";
+                const address = card.dataset.address || "";
+                const url = card.dataset.googleUrl || "";
+                const content = `
+                  <div style="font-family: 'Space Grotesk', sans-serif;">
+                    <strong>${title}</strong><br />
+                    ${address ? `<div>${address}</div>` : ""}
+                    ${url ? `<a href="${url}" target="_blank" rel="noopener">Googleマップで開く</a>` : ""}
+                  </div>
+                `;
+                infoWindow.setContent(content);
+                infoWindow.open(listMap, listMarker);
+              };
+              card.addEventListener("click", (event) => {
+                if (event.target.closest("a, button, form")) {
+                  return;
+                }
+                if (mapPanel.parentElement !== card.parentElement) {
+                  card.parentElement.insertBefore(mapPanel, card);
+                } else if (mapPanel.nextElementSibling !== card) {
+                  card.parentElement.insertBefore(mapPanel, card);
+                }
+                mapPanel.classList.add("is-visible");
+                listMap.setCenter(position);
+                listMap.setZoom(16);
+                listMarker.setPosition(position);
+                setTimeout(() => {
+                  google.maps.event.trigger(listMap, "resize");
+                  listMap.setCenter(position);
+                }, 200);
+                showInfo();
+              });
+            });
+
+            if (mapClose) {
+              mapClose.addEventListener("click", () => {
+                mapPanel.classList.remove("is-visible");
+                infoWindow.close();
+              });
+            }
+          }
+        };
+
+        if (document.readyState === "loading") {
+          document.addEventListener("DOMContentLoaded", run, { once: true });
+        } else {
+          run();
+        }
+      }
+    </script>
+    <script
+      src="https://maps.googleapis.com/maps/api/js?key={{ google_maps_api_key }}&libraries=places&callback=initScheduleSearch"
+      async
+      defer
+    ></script>
+  {% endif %}
+{% endblock %}
+
+{% block content %}
+  <section class="page-header">
+    <div>
+      <p class="eyebrow">Schedule</p>
+      <h1>予定</h1>
+      <p class="lead">日付ごとの予定とデートプランをまとめる。</p>
+    </div>
+  </section>
+
+  <section class="panel form-panel is-collapsed" id="schedule-form-panel">
+    <form method="post" class="form-grid" enctype="multipart/form-data" id="schedule-form">
+      <div>
+        <label for="title">予定</label>
+        <input id="title" name="title" type="text" placeholder="例: 映画とディナー" />
+      </div>
+      <div>
+        <label for="date">日付</label>
+        <input id="date" name="date" type="date" />
+      </div>
+      <div>
+        <label for="detail">デートプラン詳細</label>
+        <textarea id="detail" name="detail" placeholder="時間配分や過ごし方"></textarea>
+      </div>
+      <div>
+        <label for="schedule-search-input">場所を検索</label>
+        <input id="schedule-search-input" type="text" placeholder="例: 代々木公園" autocomplete="off" />
+      </div>
+      <div>
+        <label for="address">住所</label>
+        <input id="address" name="address" type="text" />
+      </div>
+      <div>
+        <label>マッププレビュー</label>
+        <div id="schedule-map" class="map-preview"></div>
+      </div>
+      <div>
+        <label>写真プレビュー</label>
+        <div class="preview-row">
+          <img id="schedule-photo-preview" class="place-photo preview is-hidden" alt="プレビュー" />
+          <button type="button" id="schedule-photo-more" class="preview-more is-hidden">
+            <span>+</span>
+            <span id="schedule-photo-count">0</span>
+          </button>
+        </div>
+      </div>
+      <div>
+        <label for="photos">写真（追加アップロード）</label>
+        <input id="photos" name="photos" type="file" accept="image/*" multiple />
+      </div>
+
+      <input type="hidden" id="place_id" name="place_id" />
+      <input type="hidden" id="lat" name="lat" />
+      <input type="hidden" id="lng" name="lng" />
+      <input type="hidden" id="photo_url" name="photo_url" />
+      <input type="hidden" id="photo_urls" name="photo_urls" />
+      <input type="hidden" id="rating" name="rating" />
+      <input type="hidden" id="user_ratings_total" name="user_ratings_total" />
+      <input type="hidden" id="website" name="website" />
+      <input type="hidden" id="phone" name="phone" />
+      <input type="hidden" id="google_url" name="google_url" />
+      <input type="hidden" id="opening_hours" name="opening_hours" />
+
+      <button class="button primary" type="submit">追加する</button>
+    </form>
+  </section>
+
+  <section class="panel">
+    <div class="panel-header">
+      <button class="button primary" type="button" id="schedule-form-toggle">追加フォームを開く</button>
+    </div>
+    <ul class="item-list">
+      <li id="schedule-map-panel" class="map-panel">
+        <div class="map-header">
+          <strong>マップ</strong>
+          <button class="button ghost map-close" type="button" id="schedule-map-close">閉じる</button>
+        </div>
+        <div id="schedule-list-map" class="map-preview"></div>
+      </li>
+      {% for item in upcoming_schedules %}
+        <li class="item-row schedule-card"
+            data-lat="{{ item['lat'] or '' }}"
+            data-lng="{{ item['lng'] or '' }}"
+            data-title="{{ item['title'] }}"
+            data-address="{{ item['address'] or '' }}"
+            data-google-url="{{ item['google_url'] or '' }}">
+          <div class="item-main">
+            <strong>{{ item["title"] }}</strong>
+            <span class="meta">{{ item["date"] }}</span>
+            {% if item["address"] %}
+              <div class="meta">{{ item["address"] }}</div>
+            {% endif %}
+            {% if item["opening_hours"] %}
+              <button type="button" class="button ghost hours-toggle">営業時間を見る</button>
+              <div class="note is-hidden hours-details">{{ item["opening_hours"] }}</div>
+            {% endif %}
+            {% if item["detail"] %}
+              <div class="note">{{ item["detail"] }}</div>
+            {% endif %}
+            {% set photos = photos_by_schedule.get(item["id"], []) %}
+            {% if photos %}
+              <div class="photo-shell">
+                <div class="photo-scroller">
+                  {% for url in photos %}
+                    <img class="place-photo" src="{{ url }}" alt="{{ item['title'] }}" />
+                  {% endfor %}
+                </div>
+              </div>
+            {% endif %}
+          </div>
+          <div class="item-actions">
+            {% if item["google_url"] %}
+              <a class="button ghost" href="{{ item['google_url'] }}" target="_blank" rel="noopener">地図</a>
+            {% endif %}
+            <a class="button ghost" href="{{ url_for('schedule_edit', schedule_id=item['id']) }}">編集</a>
+            <form method="post" action="{{ url_for('schedule_delete', schedule_id=item['id']) }}">
+              <button class="button danger" type="submit">削除</button>
+            </form>
+          </div>
+        </li>
+      {% else %}
+        <li class="item-row empty-state">まだ予定がありません。</li>
+      {% endfor %}
+    </ul>
+  </section>
+
+  <section class="section-title">
+    <h2>思い出</h2>
+  </section>
+
+  <section class="panel">
+    <div class="panel-header">
+    </div>
+    <ul class="item-list">
+      {% for item in past_schedules %}
+        <li class="item-row schedule-card"
+            data-lat="{{ item['lat'] or '' }}"
+            data-lng="{{ item['lng'] or '' }}"
+            data-title="{{ item['title'] }}"
+            data-address="{{ item['address'] or '' }}"
+            data-google-url="{{ item['google_url'] or '' }}">
+          <div class="item-main">
+            <strong>{{ item["title"] }}</strong>
+            <span class="meta">{{ item["date"] }}</span>
+            {% if item["address"] %}
+              <div class="meta">{{ item["address"] }}</div>
+            {% endif %}
+            {% if item["opening_hours"] %}
+              <button type="button" class="button ghost hours-toggle">営業時間を見る</button>
+              <div class="note is-hidden hours-details">{{ item["opening_hours"] }}</div>
+            {% endif %}
+            {% if item["detail"] %}
+              <div class="note">{{ item["detail"] }}</div>
+            {% endif %}
+            {% set photos = photos_by_schedule.get(item["id"], []) %}
+            {% if photos %}
+              <div class="photo-shell">
+                <div class="photo-scroller">
+                  {% for url in photos %}
+                    <img class="place-photo" src="{{ url }}" alt="{{ item['title'] }}" />
+                  {% endfor %}
+                </div>
+              </div>
+            {% endif %}
+          </div>
+          <div class="item-actions">
+            {% if item["google_url"] %}
+              <a class="button ghost" href="{{ item['google_url'] }}" target="_blank" rel="noopener">地図</a>
+            {% endif %}
+            <a class="button ghost" href="{{ url_for('schedule_edit', schedule_id=item['id']) }}">編集</a>
+            <form method="post" action="{{ url_for('schedule_delete', schedule_id=item['id']) }}">
+              <button class="button danger" type="submit">削除</button>
+            </form>
+          </div>
+        </li>
+      {% else %}
+        <li class="item-row empty-state">思い出はまだありません。</li>
+      {% endfor %}
+    </ul>
+  </section>
+
+  <div id="schedule-photo-modal" class="photo-modal is-hidden" role="dialog" aria-modal="true">
+    <div class="photo-modal-card">
+      <div class="photo-modal-header">
+        <strong>写真一覧</strong>
+        <button type="button" class="button ghost" id="schedule-photo-modal-close">閉じる</button>
+      </div>
+      <div class="photo-modal-body photo-shell">
+        <div class="photo-scroller" id="schedule-photo-modal-scroller"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      const formToggle = document.getElementById("schedule-form-toggle");
+      const formPanel = document.getElementById("schedule-form-panel");
+      if (formToggle && formPanel) {
+        formToggle.addEventListener("click", () => {
+          const isHidden = formPanel.classList.toggle("is-collapsed");
+          formToggle.textContent = isHidden ? "追加フォームを開く" : "追加フォームを閉じる";
+          if (!isHidden) {
+            formPanel.scrollIntoView({ behavior: "smooth", block: "start" });
+          }
+        });
+      }
+
+      const hourButtons = document.querySelectorAll(".hours-toggle");
+      hourButtons.forEach((button) => {
+        button.addEventListener("click", () => {
+          const details = button.closest(".item-main")?.querySelector(".hours-details");
+          if (!details) return;
+          const isHidden = details.classList.toggle("is-hidden");
+          button.textContent = isHidden ? "営業時間を見る" : "営業時間を隠す";
+        });
+      });
+      const modal = document.getElementById("schedule-photo-modal");
+      const modalClose = document.getElementById("schedule-photo-modal-close");
+      const modalScroller = document.getElementById("schedule-photo-modal-scroller");
+      const previewMore = document.getElementById("schedule-photo-more");
+      if (previewMore && modal && modalClose && modalScroller) {
+        previewMore.addEventListener("click", () => {
+          const list = previewMore.dataset.photos || "[]";
+          let urls = [];
+          try {
+            urls = JSON.parse(list);
+          } catch (e) {
+            urls = [];
+          }
+          modalScroller.innerHTML = "";
+          urls.forEach((url) => {
+            const img = document.createElement("img");
+            img.className = "place-photo preview";
+            img.src = url;
+            img.alt = "プレビュー";
+            modalScroller.appendChild(img);
+          });
+          modal.classList.remove("is-hidden");
+        });
+        modalClose.addEventListener("click", () => {
+          modal.classList.add("is-hidden");
+        });
+        modal.addEventListener("click", (event) => {
+          if (event.target === modal) {
+            modal.classList.add("is-hidden");
+          }
+        });
+      }
+    });
+  </script>
+{% endblock %}

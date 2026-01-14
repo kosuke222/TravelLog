@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <section class="page-header">
+    <div>
+      <p class="eyebrow">Game Memo</p>
+      <h1>やりたいゲームメモ</h1>
+      <p class="lead">アイデアをメモして、あとで整理。</p>
+    </div>
+  </section>
+
+  <section class="panel form-panel">
+    <form method="post" class="form-grid">
+      <div>
+        <label for="title">タイトル</label>
+        <input id="title" name="title" type="text" placeholder="例: 2人協力パズル" required />
+      </div>
+      <div>
+        <label for="body">内容</label>
+        <textarea id="body" name="body" placeholder="ルールや世界観を書いておく" required></textarea>
+      </div>
+      <button class="button primary" type="submit">保存する</button>
+    </form>
+  </section>
+
+  <section class="grid">
+    {% for memo in memos %}
+      <article class="panel memo-card">
+        <div class="card-header">
+          <h2>{{ memo["title"] }}</h2>
+          <span class="meta">{{ memo["created_at"] }}</span>
+        </div>
+        <p class="memo-body">{{ memo["body"] }}</p>
+        <form method="post" action="{{ url_for('games_memo_delete', memo_id=memo['id']) }}">
+          <button class="button danger" type="submit">削除</button>
+        </form>
+      </article>
+    {% else %}
+      <article class="panel empty-state">
+        <p>まだメモがありません。</p>
+      </article>
+    {% endfor %}
+  </section>
+{% endblock %}

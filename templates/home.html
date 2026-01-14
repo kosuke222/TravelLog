@@ -1,0 +1,49 @@
+﻿{% extends "base.html" %}
+
+{% block content %}
+  <section class="hero">
+    <div>
+      <p class="eyebrow">Daily Mix</p>
+      <h1>今日の予定をひとまとめに</h1>
+      <p class="lead">
+        もっとディズニーっぽくしたい笑笑
+      </p>
+    </div>
+  </section>
+
+  <section class="grid">
+    <a class="panel card-link schedule-card" href="{{ url_for('schedule') }}">
+      <span class="card-meta">Next Schedule</span>
+      <h2>次の予定</h2>
+      {% if next_schedule %}
+        <div class="schedule-meta schedule-date">{{ next_schedule.date or next_schedule.created_at }}</div>
+        <div class="schedule-title">{{ next_schedule.title or "予定" }}</div>
+        {% if next_schedule.detail %}
+          <p class="schedule-snippet">{{ next_schedule.detail | truncate(60, True) }}</p>
+        {% endif %}
+      {% else %}
+        <p class="schedule-snippet">予定はまだありません。</p>
+      {% endif %}
+      <span class="link-arrow">詳細へ -&gt;</span>
+    </a>
+
+    <a class="panel card-link icon-card" href="{{ url_for('places') }}">
+      <span class="card-icon">
+        <img src="{{ url_for('static', filename='mickey.jpg') }}" alt="行きたい場所" />
+      </span>
+      <h2>行きたい場所</h2>
+    </a>
+    <a class="panel card-link icon-card" href="{{ url_for('memo') }}">
+      <span class="card-icon">
+        <img src="{{ url_for('static', filename='mini.jpg') }}" alt="メモ" />
+      </span>
+      <h2>メモ</h2>
+    </a>
+    <a class="panel card-link icon-card" href="{{ url_for('games') }}">
+      <span class="card-icon">
+        <img src="{{ url_for('static', filename='dona.jpg') }}" alt="ゲーム" />
+      </span>
+      <h2>ゲーム</h2>
+    </a>
+  </section>
+{% endblock %}
