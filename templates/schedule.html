@@ -253,7 +253,11 @@
           <div class="item-main">
             <strong>{{ item["title"] }}</strong>
             <span class="meta">{{ item["date"] }}</span>
-            {% if item["address"] %}
+            {% if item["place_id"] %}
+              <div class="meta place-name"
+                   data-place-id="{{ item['place_id'] }}"
+                   data-fallback="{{ item['address'] or '' }}">{{ item["address"] or "場所名" }}</div>
+            {% elif item["address"] %}
               <div class="meta">{{ item["address"] }}</div>
             {% endif %}
             {% if item["opening_hours"] %}
@@ -280,6 +284,12 @@
             {% endif %}
           </div>
           <div class="item-actions">
+            {% set search_query = (item["title"] or "") | urlencode %}
+            <a class="button ghost search-link"
+               href="https://www.google.com/search?q={{ search_query }}"
+               data-default-query="{{ item['title'] or '' }}"
+               target="_blank"
+               rel="noopener">検索</a>
             {% if item["google_url"] %}
               <a class="button ghost" href="{{ item['google_url'] }}" target="_blank" rel="noopener">地図</a>
             {% endif %}
@@ -313,7 +323,11 @@
           <div class="item-main">
             <strong>{{ item["title"] }}</strong>
             <span class="meta">{{ item["date"] }}</span>
-            {% if item["address"] %}
+            {% if item["place_id"] %}
+              <div class="meta place-name"
+                   data-place-id="{{ item['place_id'] }}"
+                   data-fallback="{{ item['address'] or '' }}">{{ item["address"] or "場所名" }}</div>
+            {% elif item["address"] %}
               <div class="meta">{{ item["address"] }}</div>
             {% endif %}
             {% if item["opening_hours"] %}
@@ -340,6 +354,12 @@
             {% endif %}
           </div>
           <div class="item-actions">
+            {% set search_query = (item["title"] or "") | urlencode %}
+            <a class="button ghost search-link"
+               href="https://www.google.com/search?q={{ search_query }}"
+               data-default-query="{{ item['title'] or '' }}"
+               target="_blank"
+               rel="noopener">検索</a>
             {% if item["google_url"] %}
               <a class="button ghost" href="{{ item['google_url'] }}" target="_blank" rel="noopener">地図</a>
             {% endif %}
@@ -396,6 +416,31 @@
           button.textContent = isHidden ? "営業時間を見る" : "営業時間を隠す";
         });
       });
+
+      if (window.google && google.maps && google.maps.places) {
+        const nameService = new google.maps.places.PlacesService(document.createElement("div"));
+        const placeNameEls = document.querySelectorAll(".place-name[data-place-id]");
+        placeNameEls.forEach((el) => {
+          const placeId = el.dataset.placeId;
+          if (!placeId) return;
+          nameService.getDetails({ placeId, fields: ["name"] }, (details, status) => {
+            if (status === google.maps.places.PlacesServiceStatus.OK && details?.name) {
+              el.textContent = details.name;
+              const card = el.closest(".schedule-card");
+              const searchLink = card?.querySelector(".search-link");
+              if (searchLink) {
+                searchLink.href = `https://www.google.com/search?q=${encodeURIComponent(details.name)}`;
+              }
+              return;
+            }
+            const fallback = el.dataset.fallback || "";
+            if (fallback) {
+              el.textContent = fallback;
+            }
+          });
+        });
+      }
+
       const modal = document.getElementById("schedule-photo-modal");
       const modalClose = document.getElementById("schedule-photo-modal-close");
       const modalScroller = document.getElementById("schedule-photo-modal-scroller");

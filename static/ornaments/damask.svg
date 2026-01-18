@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="420" height="420" viewBox="0 0 420 420">
+  <defs>
+    <pattern id="damask" width="140" height="140" patternUnits="userSpaceOnUse">
+      <rect width="140" height="140" fill="#8a5a21"/>
+      <path d="M70 18c20 14 34 32 42 54-8 22-22 40-42 54-20-14-34-32-42-54 8-22 22-40 42-54z" fill="#b8833f" opacity="0.72"/>
+      <path d="M70 38c12 8 21 18 26 32-5 14-14 24-26 32-12-8-21-18-26-32 5-14 14-24 26-32z" fill="#d2a65e" opacity="0.75"/>
+      <path d="M70 8v18M70 114v18M8 70h18M114 70h18" stroke="#c79a54" stroke-width="3" opacity="0.55"/>
+      <path d="M28 28l12 12M100 100l12 12M112 28l-12 12M40 100l-12 12" stroke="#a97636" stroke-width="2" opacity="0.45"/>
+      <path d="M20 70c10-14 20-20 30-20s20 6 30 20" stroke="#d6b170" stroke-width="2" opacity="0.45"/>
+      <path d="M20 70c10 14 20 20 30 20s20-6 30-20" stroke="#a87135" stroke-width="2" opacity="0.45"/>
+    </pattern>
+  </defs>
+  <rect width="420" height="420" fill="url(#damask)"/>
+</svg>

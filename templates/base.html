@@ -10,7 +10,11 @@
   <body>
     <div class="bg-orbit"></div>
     <header class="site-header">
-      <div class="logo">KouHina App</div>
+      <div class="logo-row">
+        <button class="button ghost image-next" type="button" id="image-switch" hidden>次の画像</button>
+        <div class="logo">KouHina App</div>
+        <button class="button ghost image-reveal" type="button" aria-controls="image-switch" aria-expanded="false">画像切替</button>
+      </div>
       <nav class="nav">
         <a href="{{ url_for('home') }}" class="{% if request.endpoint == 'home' %}active{% endif %}" {% if request.endpoint == 'home' %}aria-current="page"{% endif %}>ホーム</a>
         <a href="{{ url_for('schedule') }}" class="{% if request.endpoint in ['schedule', 'schedule_edit'] %}active{% endif %}" {% if request.endpoint in ['schedule', 'schedule_edit'] %}aria-current="page"{% endif %}>予定</a>
@@ -27,5 +31,50 @@
     <footer class="site-footer">
       <span>遊びと管理をひとつに。</span>
     </footer>
+
+    <script>
+      document.addEventListener("DOMContentLoaded", () => {
+        const dangerButtons = document.querySelectorAll("form button.button.danger");
+        dangerButtons.forEach((button) => {
+          const form = button.closest("form");
+          if (!form) return;
+          form.addEventListener("submit", (event) => {
+            const ok = window.confirm("\u524a\u9664\u3057\u3066\u3082\u3088\u308d\u3057\u3044\u3067\u3059\u304b\uFF1F");
+            if (!ok) {
+              event.preventDefault();
+            }
+          });
+        });
+
+        const revealButton = document.querySelector(".image-reveal");
+        const nextButton = document.querySelector(".image-next");
+        if (revealButton && nextButton) {
+          revealButton.addEventListener("click", () => {
+            if (nextButton.hasAttribute("hidden")) {
+              nextButton.removeAttribute("hidden");
+              revealButton.setAttribute("aria-expanded", "true");
+            }
+          });
+          nextButton.addEventListener("click", () => {
+            const heroImage = document.querySelector(".card-image-top[data-images]");
+            if (!heroImage) return;
+            let images = [];
+            try {
+              images = JSON.parse(heroImage.dataset.images || "[]");
+            } catch (e) {
+              images = [];
+            }
+            if (!images.length) return;
+            const currentIndex = Number(heroImage.dataset.currentIndex || "0");
+            const nextIndex = (currentIndex + 1) % images.length;
+            heroImage.dataset.currentIndex = String(nextIndex);
+            heroImage.src = images[nextIndex];
+            const today = new Date().toISOString().slice(0, 10);
+            window.localStorage.setItem("heroImageIndex", String(nextIndex));
+            window.localStorage.setItem("heroImageDate", today);
+          });
+        }
+      });
+    </script>
   </body>
 </html>

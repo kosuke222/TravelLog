@@ -112,6 +112,13 @@ def upload_place_photos(sb: Client, files):
 
 @app.route("/")
 def home():
+    image_dir = os.path.join(app.static_folder, "img")
+    image_files = []
+    if os.path.isdir(image_dir):
+        for name in os.listdir(image_dir):
+            if name.lower().endswith((".png", ".jpg", ".jpeg", ".webp")):
+                image_files.append(f"img/{name}")
+    image_files.sort()
     sb = get_supabase()
     schedules = (
         sb.table("schedules")
@@ -132,6 +139,7 @@ def home():
     return render_template(
         "home.html",
         next_schedule=next_schedule,
+        hero_images=image_files,
     )
 
 
@@ -293,9 +301,6 @@ def places():
             )
     for row in rows:
         place_photos = photos_by_place.get(row["id"], [])
-        main_url = row.get("photo_url")
-        if main_url:
-            place_photos.append({"id": None, "url": main_url})
         if place_photos:
             deduped = {}
             for photo in place_photos:
@@ -528,9 +533,6 @@ def schedule():
             )
     for row in schedules:
         schedule_photos = photos_by_schedule.get(row["id"], [])
-        main_url = row.get("photo_url")
-        if main_url:
-            schedule_photos.append({"id": None, "url": main_url})
         if schedule_photos:
             deduped = {}
             for photo in schedule_photos:

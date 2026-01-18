@@ -1,17 +1,21 @@
 ﻿{% extends "base.html" %}
 
 {% block content %}
-  <section class="hero">
-    <div>
-      <p class="eyebrow">Daily Mix</p>
-      <h1>今日の記録とスケジュール</h1>
-      <p class="lead">
-        もっとディズニーっぽくしたい笑笑
-      </p>
-    </div>
-  </section>
-
   <section class="grid">
+    <a class="panel card-link image-card" href="{{ url_for('schedule') }}">
+      <img
+        class="card-image-top"
+        src="{{ url_for('static', filename=(hero_images[0] if hero_images else 'img/mmm.png')) }}"
+        alt="今日の記録とスケジュール"
+        data-images='[
+          {% for image in hero_images %}
+            "{{ url_for("static", filename=image) }}"{% if not loop.last %},{% endif %}
+          {% endfor %}
+        ]'
+        data-current-index="0"
+      />
+    </a>
+
     <a class="panel card-link schedule-card" href="{{ url_for('schedule') }}">
       <span class="card-meta">Next Schedule</span>
       <h2>次の予定</h2>
@@ -46,4 +50,29 @@
       <h2>ゲーム</h2>
     </a>
   </section>
+
+  <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      const heroImage = document.querySelector(".card-image-top[data-images]");
+      if (!heroImage) return;
+      let images = [];
+      try {
+        images = JSON.parse(heroImage.dataset.images || "[]");
+      } catch (e) {
+        images = [];
+      }
+      if (!images.length) return;
+      const today = new Date().toISOString().slice(0, 10);
+      const storedIndex = Number(window.localStorage.getItem("heroImageIndex") || "0");
+      const storedDate = window.localStorage.getItem("heroImageDate");
+      let nextIndex = storedIndex;
+      if (storedDate !== today) {
+        nextIndex = (storedIndex + 1) % images.length;
+        window.localStorage.setItem("heroImageDate", today);
+        window.localStorage.setItem("heroImageIndex", String(nextIndex));
+      }
+      heroImage.src = images[nextIndex];
+      heroImage.dataset.currentIndex = String(nextIndex);
+    });
+  </script>
 {% endblock %}

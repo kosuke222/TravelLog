@@ -171,44 +171,6 @@
             }
           }
 
-          if (window.google && google.maps && google.maps.places) {
-            const refreshQueue = new Set();
-            const service = new google.maps.places.PlacesService(document.createElement("div"));
-            document.querySelectorAll(".place-card img.place-photo").forEach((img) => {
-              img.addEventListener("error", () => {
-                const card = img.closest(".place-card");
-                const placeId = card?.dataset.placeId;
-                if (!placeId || refreshQueue.has(placeId)) {
-                  return;
-                }
-                refreshQueue.add(placeId);
-                service.getDetails({ placeId, fields: ["photos"] }, (details, status) => {
-                  if (status !== google.maps.places.PlacesServiceStatus.OK || !details) {
-                    return;
-                  }
-                  const photos = details.photos || [];
-                  if (!photos.length) {
-                    return;
-                  }
-                  const scroller = card.querySelector(".photo-scroller");
-                  if (!scroller) {
-                    return;
-                  }
-                  scroller.innerHTML = "";
-                  photos.slice(0, 6).forEach((photo) => {
-                    const photoImg = document.createElement("img");
-                    photoImg.className = "place-photo";
-                    photoImg.src = photo.getUrl({ maxWidth: 600, maxHeight: 400 });
-                    photoImg.alt = card.dataset.name || "写真";
-                    photoImg.dataset.photoUrl = photoImg.src;
-                    photoImg.dataset.placeId = placeId;
-                    scroller.appendChild(photoImg);
-                  });
-                });
-              }, { once: true });
-            });
-          }
-
         };
 
         if (document.readyState === "loading") {
@@ -370,6 +332,8 @@
             {% endif %}
           </div>
           <div class="item-actions">
+            {% set search_query = (place["name"] or "") | urlencode %}
+            <a class="button ghost" href="https://www.google.com/search?q={{ search_query }}" target="_blank" rel="noopener">検索</a>
             {% if place["google_url"] %}
               <a class="button ghost" href="{{ place['google_url'] }}" target="_blank" rel="noopener">地図</a>
             {% endif %}
