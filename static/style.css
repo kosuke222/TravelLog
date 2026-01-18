@@ -929,6 +929,12 @@ body {
     max-width: 80vw;
   }
 
+  .card-image-top {
+    height: 180px;
+    object-fit: contain;
+    background: #fffaf2;
+  }
+
   .cta-row {
     flex-direction: column;
     align-items: stretch;
