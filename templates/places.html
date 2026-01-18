@@ -96,7 +96,7 @@
             let mapped = "その他";
             if (typeSet.has("restaurant")) mapped = "レストラン";
             if (typeSet.has("cafe")) mapped = "カフェ";
-            if (typeSet.has("bar") || typeSet.has("night_club")) mapped = "バー";
+            if (typeSet.has("bar") || typeSet.has("night_club")) mapped = "居酒屋";
             if (typeSet.has("liquor_store") || typeSet.has("meal_takeaway")) mapped = "居酒屋";
             if (typeSet.has("park") || typeSet.has("museum") || typeSet.has("tourist_attraction")) {
               mapped = "スポット";
@@ -141,7 +141,7 @@
                 infoWindow.open(listMap, listMarker);
               };
               card.addEventListener("click", (event) => {
-                if (event.target.closest("a, button, form")) {
+                if (event.target.closest("a, button, form, .place-photo")) {
                   return;
                 }
                 if (mapPanel.parentElement !== card.parentElement) {
@@ -169,6 +169,44 @@
                 }
               });
             }
+          }
+
+          if (window.google && google.maps && google.maps.places) {
+            const refreshQueue = new Set();
+            const service = new google.maps.places.PlacesService(document.createElement("div"));
+            document.querySelectorAll(".place-card img.place-photo").forEach((img) => {
+              img.addEventListener("error", () => {
+                const card = img.closest(".place-card");
+                const placeId = card?.dataset.placeId;
+                if (!placeId || refreshQueue.has(placeId)) {
+                  return;
+                }
+                refreshQueue.add(placeId);
+                service.getDetails({ placeId, fields: ["photos"] }, (details, status) => {
+                  if (status !== google.maps.places.PlacesServiceStatus.OK || !details) {
+                    return;
+                  }
+                  const photos = details.photos || [];
+                  if (!photos.length) {
+                    return;
+                  }
+                  const scroller = card.querySelector(".photo-scroller");
+                  if (!scroller) {
+                    return;
+                  }
+                  scroller.innerHTML = "";
+                  photos.slice(0, 6).forEach((photo) => {
+                    const photoImg = document.createElement("img");
+                    photoImg.className = "place-photo";
+                    photoImg.src = photo.getUrl({ maxWidth: 600, maxHeight: 400 });
+                    photoImg.alt = card.dataset.name || "写真";
+                    photoImg.dataset.photoUrl = photoImg.src;
+                    photoImg.dataset.placeId = placeId;
+                    scroller.appendChild(photoImg);
+                  });
+                });
+              }, { once: true });
+            });
           }
 
         };
@@ -202,6 +240,15 @@
     {% for cat in categories %}
       <a class="tab {% if active_category == cat %}active{% endif %}" href="{{ url_for('places', category=cat) }}">{{ cat }}</a>
     {% endfor %}
+  </section>
+
+  <section class="panel form-panel">
+    <div class="form-grid">
+      <div>
+        <label for="place-search-list">リスト内検索</label>
+        <input id="place-search-list" type="search" placeholder="駅名・店名・住所で検索" />
+      </div>
+    </div>
   </section>
 
   <section class="panel form-panel is-collapsed" id="place-form-panel">
@@ -288,6 +335,7 @@
             data-name="{{ place['name'] }}"
             data-address="{{ place['address'] or '' }}"
             data-rating="{{ place['rating'] or '' }}"
+            data-place-id="{{ place['place_id'] or '' }}"
             data-google-url="{{ place['google_url'] or '' }}">
           <div class="item-main">
             <strong>{{ place["name"] }}</strong>
@@ -309,8 +357,13 @@
             {% if photos %}
               <div class="photo-shell">
                 <div class="photo-scroller">
-                  {% for url in photos %}
-                    <img class="place-photo" src="{{ url }}" alt="{{ place['name'] }}" />
+                  {% for photo in photos[:3] %}
+                    <img class="place-photo"
+                         src="{{ photo['url'] }}"
+                         alt="{{ place['name'] }}"
+                         data-photo-id="{{ photo['id'] or '' }}"
+                         data-photo-url="{{ photo['url'] }}"
+                         data-place-id="{{ place['id'] }}" />
                   {% endfor %}
                 </div>
               </div>
@@ -341,6 +394,13 @@
       <div class="photo-modal-body photo-shell">
         <div class="photo-scroller" id="photo-modal-scroller"></div>
       </div>
+      <form method="post" action="{{ url_for('places_photo_delete') }}" id="photo-delete-form" class="inline-actions is-hidden">
+        <input type="hidden" name="photo_id" id="photo-delete-id" />
+        <input type="hidden" name="photo_url" id="photo-delete-url" />
+        <input type="hidden" name="place_id" id="photo-delete-place" />
+        <input type="hidden" name="category" value="{{ active_category }}" />
+        <button class="button danger" type="submit">写真を削除</button>
+      </form>
     </div>
   </div>
 
@@ -372,6 +432,10 @@
       const modalClose = document.getElementById("photo-modal-close");
       const modalScroller = document.getElementById("photo-modal-scroller");
       const previewMore = document.getElementById("place-photo-more");
+      const deleteForm = document.getElementById("photo-delete-form");
+      const deleteId = document.getElementById("photo-delete-id");
+      const deleteUrl = document.getElementById("photo-delete-url");
+      const deletePlace = document.getElementById("photo-delete-place");
       if (previewMore && modal && modalClose && modalScroller) {
         previewMore.addEventListener("click", () => {
           const list = previewMore.dataset.photos || "[]";
@@ -389,6 +453,9 @@
             img.alt = "プレビュー";
             modalScroller.appendChild(img);
           });
+          if (deleteForm) {
+            deleteForm.classList.add("is-hidden");
+          }
           modal.classList.remove("is-hidden");
         });
         modalClose.addEventListener("click", () => {
@@ -398,6 +465,41 @@
           if (event.target === modal) {
             modal.classList.add("is-hidden");
           }
+        });
+      }
+
+      const listPhotos = document.querySelectorAll(".place-card .place-photo");
+      listPhotos.forEach((img) => {
+        img.addEventListener("click", (event) => {
+          event.stopPropagation();
+          if (!modal || !modalScroller) return;
+          modalScroller.innerHTML = "";
+          const photo = document.createElement("img");
+          photo.className = "place-photo preview";
+          photo.src = img.src;
+          photo.alt = img.alt || "写真";
+          modalScroller.appendChild(photo);
+          if (deleteForm && deleteId && deleteUrl && deletePlace) {
+            deleteId.value = img.dataset.photoId || "";
+            deleteUrl.value = img.dataset.photoUrl || "";
+            deletePlace.value = img.dataset.placeId || "";
+            deleteForm.classList.remove("is-hidden");
+          }
+          modal.classList.remove("is-hidden");
+        });
+      });
+
+      const searchInput = document.getElementById("place-search-list");
+      const placeCards = Array.from(document.querySelectorAll(".place-card"));
+      if (searchInput && placeCards.length) {
+        searchInput.addEventListener("input", () => {
+          const query = searchInput.value.trim().toLowerCase();
+          placeCards.forEach((card) => {
+            const name = (card.dataset.name || "").toLowerCase();
+            const address = (card.dataset.address || "").toLowerCase();
+            const matches = !query || name.includes(query) || address.includes(query);
+            card.style.display = matches ? "" : "none";
+          });
         });
       }
     });

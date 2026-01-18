@@ -12,7 +12,7 @@ load_dotenv()
 
 app = Flask(__name__, template_folder="templates", static_folder="static")
 
-PLACE_CATEGORIES = ["スポット", "レストラン", "居酒屋", "カフェ", "バー", "その他"]
+PLACE_CATEGORIES = ["スポット", "レストラン", "居酒屋", "カフェ", "その他"]
 LEGACY_CATEGORY_MAP = {
     "spot": "スポット",
     "restaurant": "レストラン",
@@ -41,6 +41,8 @@ def parse_date(value):
         return datetime.strptime(value, "%Y-%m-%d").date()
     except ValueError:
         return None
+
+
 
 
 def parse_float(value):
@@ -126,14 +128,11 @@ def home():
         if row_date and row_date >= today:
             next_schedule = row
             break
-    if not next_schedule:
-        for row in schedules:
-            if row.get("date"):
-                next_schedule = row
-                break
-    if not next_schedule and schedules:
-        next_schedule = schedules[0]
-    return render_template("home.html", next_schedule=next_schedule)
+    # If there is no upcoming schedule, keep it empty.
+    return render_template(
+        "home.html",
+        next_schedule=next_schedule,
+    )
 
 
 @app.route("/games")
@@ -289,18 +288,23 @@ def places():
             .data
         )
         for photo in photos:
-            photos_by_place.setdefault(photo["place_id"], []).append(photo["photo_url"])
+            photos_by_place.setdefault(photo["place_id"], []).append(
+                {"id": photo["id"], "url": photo["photo_url"]}
+            )
     for row in rows:
-        if row.get("photo_url") and not photos_by_place.get(row["id"]):
-            photos_by_place[row["id"]] = [row["photo_url"]]
-        if photos_by_place.get(row["id"]):
-            seen = set()
-            unique = []
-            for url in photos_by_place[row["id"]]:
-                if url and url not in seen:
-                    seen.add(url)
-                    unique.append(url)
-            photos_by_place[row["id"]] = unique
+        place_photos = photos_by_place.get(row["id"], [])
+        main_url = row.get("photo_url")
+        if main_url:
+            place_photos.append({"id": None, "url": main_url})
+        if place_photos:
+            deduped = {}
+            for photo in place_photos:
+                url = photo.get("url")
+                if not url:
+                    continue
+                if url not in deduped or (deduped[url]["id"] is None and photo.get("id")):
+                    deduped[url] = photo
+            photos_by_place[row["id"]] = list(deduped.values())
     return render_template(
         "places.html",
         places=rows,
@@ -402,6 +406,27 @@ def places_delete(place_id):
     return redirect(url_for("places"))
 
 
+@app.post("/places/photo/delete")
+def places_photo_delete():
+    sb = get_supabase()
+    photo_id = request.form.get("photo_id") or None
+    place_id = request.form.get("place_id") or None
+    photo_url = request.form.get("photo_url") or None
+    category = request.form.get("category") or "all"
+    if photo_id and str(photo_id).isdigit():
+        photo_id = int(photo_id)
+    if place_id and str(place_id).isdigit():
+        place_id = int(place_id)
+    if photo_id:
+        sb.table("place_photos").delete().eq("id", photo_id).execute()
+    if place_id and photo_url:
+        sb.table("place_photos").delete().eq("place_id", place_id).eq("photo_url", photo_url).execute()
+        sb.table("places").update({"photo_url": None}).eq("id", place_id).eq(
+            "photo_url", photo_url
+        ).execute()
+    return redirect(url_for("places", category=category))
+
+
 @app.route("/schedule", methods=["GET", "POST"])
 def schedule():
     sb = get_supabase()
@@ -498,18 +523,23 @@ def schedule():
             .data
         )
         for photo in photos:
-            photos_by_schedule.setdefault(photo["schedule_id"], []).append(photo["photo_url"])
+            photos_by_schedule.setdefault(photo["schedule_id"], []).append(
+                {"id": photo["id"], "url": photo["photo_url"]}
+            )
     for row in schedules:
-        if row.get("photo_url") and not photos_by_schedule.get(row["id"]):
-            photos_by_schedule[row["id"]] = [row["photo_url"]]
-        if photos_by_schedule.get(row["id"]):
-            seen = set()
-            unique = []
-            for url in photos_by_schedule[row["id"]]:
-                if url and url not in seen:
-                    seen.add(url)
-                    unique.append(url)
-            photos_by_schedule[row["id"]] = unique
+        schedule_photos = photos_by_schedule.get(row["id"], [])
+        main_url = row.get("photo_url")
+        if main_url:
+            schedule_photos.append({"id": None, "url": main_url})
+        if schedule_photos:
+            deduped = {}
+            for photo in schedule_photos:
+                url = photo.get("url")
+                if not url:
+                    continue
+                if url not in deduped or (deduped[url]["id"] is None and photo.get("id")):
+                    deduped[url] = photo
+            photos_by_schedule[row["id"]] = list(deduped.values())
     return render_template(
         "schedule.html",
         upcoming_schedules=upcoming,
@@ -602,6 +632,28 @@ def schedule_update(schedule_id):
 def schedule_delete(schedule_id):
     sb = get_supabase()
     sb.table("schedules").delete().eq("id", schedule_id).execute()
+    return redirect(url_for("schedule"))
+
+
+@app.post("/schedule/photo/delete")
+def schedule_photo_delete():
+    sb = get_supabase()
+    photo_id = request.form.get("photo_id") or None
+    schedule_id = request.form.get("schedule_id") or None
+    photo_url = request.form.get("photo_url") or None
+    if photo_id and str(photo_id).isdigit():
+        photo_id = int(photo_id)
+    if schedule_id and str(schedule_id).isdigit():
+        schedule_id = int(schedule_id)
+    if photo_id:
+        sb.table("schedule_photos").delete().eq("id", photo_id).execute()
+    if schedule_id and photo_url:
+        sb.table("schedule_photos").delete().eq("schedule_id", schedule_id).eq(
+            "photo_url", photo_url
+        ).execute()
+        sb.table("schedules").update({"photo_url": None}).eq("id", schedule_id).eq(
+            "photo_url", photo_url
+        ).execute()
     return redirect(url_for("schedule"))
 
 

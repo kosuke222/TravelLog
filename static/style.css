@@ -81,6 +81,9 @@ body {
   line-height: 1.1;
   font-size: 0.8rem;
   min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .nav a:hover {
@@ -320,6 +323,7 @@ body {
   grid-column: 1 / -1;
   gap: 10px;
 }
+
 
 .schedule-meta {
   font-size: 0.85rem;
@@ -628,7 +632,7 @@ body {
 }
 
 .photo-modal-card {
-  width: min(520px, 92vw);
+  width: min(720px, 94vw);
   background: var(--card);
   border: 1px solid var(--outline);
   border-radius: 18px;
@@ -645,7 +649,14 @@ body {
 }
 
 .photo-modal-body {
+  max-height: 70vh;
+}
+
+.photo-modal-body .place-photo.preview {
+  width: min(680px, 90vw);
+  height: auto;
   max-height: 60vh;
+  object-fit: contain;
 }
 
 .note {
@@ -746,8 +757,10 @@ body {
   }
 
   .nav a {
-    font-size: 0.78rem;
+    font-size: 0.6rem;
     padding: 8px 4px;
+    white-space: nowrap;
+    line-height: 1.0;
   }
 
   .item-row {
@@ -790,6 +803,7 @@ body {
     transform: translateY(0);
   }
 }
+
 
 /* =========================================
    写真プレビュー専用のスクロールエリア

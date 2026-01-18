@@ -267,8 +267,13 @@
             {% if photos %}
               <div class="photo-shell">
                 <div class="photo-scroller">
-                  {% for url in photos %}
-                    <img class="place-photo" src="{{ url }}" alt="{{ item['title'] }}" />
+                  {% for photo in photos[:3] %}
+                    <img class="place-photo"
+                         src="{{ photo['url'] }}"
+                         alt="{{ item['title'] }}"
+                         data-photo-id="{{ photo['id'] or '' }}"
+                         data-photo-url="{{ photo['url'] }}"
+                         data-schedule-id="{{ item['id'] }}" />
                   {% endfor %}
                 </div>
               </div>
@@ -322,8 +327,13 @@
             {% if photos %}
               <div class="photo-shell">
                 <div class="photo-scroller">
-                  {% for url in photos %}
-                    <img class="place-photo" src="{{ url }}" alt="{{ item['title'] }}" />
+                  {% for photo in photos[:3] %}
+                    <img class="place-photo"
+                         src="{{ photo['url'] }}"
+                         alt="{{ item['title'] }}"
+                         data-photo-id="{{ photo['id'] or '' }}"
+                         data-photo-url="{{ photo['url'] }}"
+                         data-schedule-id="{{ item['id'] }}" />
                   {% endfor %}
                 </div>
               </div>
@@ -354,6 +364,12 @@
       <div class="photo-modal-body photo-shell">
         <div class="photo-scroller" id="schedule-photo-modal-scroller"></div>
       </div>
+      <form method="post" action="{{ url_for('schedule_photo_delete') }}" id="schedule-photo-delete-form" class="inline-actions is-hidden">
+        <input type="hidden" name="photo_id" id="schedule-photo-delete-id" />
+        <input type="hidden" name="photo_url" id="schedule-photo-delete-url" />
+        <input type="hidden" name="schedule_id" id="schedule-photo-delete-schedule" />
+        <button class="button danger" type="submit">写真を削除</button>
+      </form>
     </div>
   </div>
 
@@ -384,6 +400,10 @@
       const modalClose = document.getElementById("schedule-photo-modal-close");
       const modalScroller = document.getElementById("schedule-photo-modal-scroller");
       const previewMore = document.getElementById("schedule-photo-more");
+      const deleteForm = document.getElementById("schedule-photo-delete-form");
+      const deleteId = document.getElementById("schedule-photo-delete-id");
+      const deleteUrl = document.getElementById("schedule-photo-delete-url");
+      const deleteSchedule = document.getElementById("schedule-photo-delete-schedule");
       if (previewMore && modal && modalClose && modalScroller) {
         previewMore.addEventListener("click", () => {
           const list = previewMore.dataset.photos || "[]";
@@ -401,6 +421,9 @@
             img.alt = "プレビュー";
             modalScroller.appendChild(img);
           });
+          if (deleteForm) {
+            deleteForm.classList.add("is-hidden");
+          }
           modal.classList.remove("is-hidden");
         });
         modalClose.addEventListener("click", () => {
@@ -412,6 +435,27 @@
           }
         });
       }
+
+      const listPhotos = document.querySelectorAll(".schedule-card .place-photo");
+      listPhotos.forEach((img) => {
+        img.addEventListener("click", (event) => {
+          event.stopPropagation();
+          if (!modal || !modalScroller) return;
+          modalScroller.innerHTML = "";
+          const photo = document.createElement("img");
+          photo.className = "place-photo preview";
+          photo.src = img.src;
+          photo.alt = img.alt || "写真";
+          modalScroller.appendChild(photo);
+          if (deleteForm && deleteId && deleteUrl && deleteSchedule) {
+            deleteId.value = img.dataset.photoId || "";
+            deleteUrl.value = img.dataset.photoUrl || "";
+            deleteSchedule.value = img.dataset.scheduleId || "";
+            deleteForm.classList.remove("is-hidden");
+          }
+          modal.classList.remove("is-hidden");
+        });
+      });
     });
   </script>
 {% endblock %}
