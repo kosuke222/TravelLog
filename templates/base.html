@@ -49,14 +49,19 @@
         const confirmCancel = document.getElementById("confirm-cancel");
         const confirmOk = document.getElementById("confirm-ok");
         let pendingForm = null;
+        let pendingButton = null;
         dangerButtons.forEach((button) => {
-          const form = button.closest("form");
-          if (!form) return;
-          form.addEventListener("submit", (event) => {
+          button.addEventListener("click", (event) => {
+            if (button.dataset.confirm === "false") {
+              return;
+            }
             if (!confirmModal) return;
             event.preventDefault();
-            pendingForm = form;
-            confirmModal.classList.remove("is-hidden");
+            pendingForm = button.form || button.closest("form");
+            pendingButton = button;
+            if (pendingForm) {
+              confirmModal.classList.remove("is-hidden");
+            }
           });
         });
         if (confirmCancel && confirmModal) {
@@ -70,6 +75,7 @@
             if (pendingForm) {
               pendingForm.submit();
               pendingForm = null;
+              pendingButton = null;
             }
             confirmModal.classList.add("is-hidden");
           });
@@ -85,9 +91,11 @@
             }
           });
           nextButton.addEventListener("click", () => {
-            if (typeof window.__applyDailyImage === "function") {
-              window.__applyDailyImage();
-            }
+            const heroImage = document.querySelector(".card-image-top[data-images]");
+            if (!heroImage || typeof window.__setHeroImage !== "function") return;
+            const currentIndex = Number(heroImage.dataset.currentIndex || "0");
+            const nextIndex = currentIndex + 1;
+            window.__setHeroImage(nextIndex);
           });
         }
       });

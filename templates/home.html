@@ -93,10 +93,16 @@
         return Math.floor(utcDay / 86400000) % images.length;
       };
 
+      const setHeroImage = (index) => {
+        const safeIndex = ((index % images.length) + images.length) % images.length;
+        heroImage.src = images[safeIndex];
+        heroImage.dataset.currentIndex = String(safeIndex);
+      };
+
       const applyDailyImage = () => {
         const index = getDayIndex();
-        heroImage.src = images[index];
-        heroImage.dataset.currentIndex = String(index);
+        window.__dailyImageIndex = index;
+        setHeroImage(index);
       };
 
       const scheduleNextMidnight = () => {
@@ -113,6 +119,7 @@
       };
 
       window.__applyDailyImage = applyDailyImage;
+      window.__setHeroImage = setHeroImage;
       applyDailyImage();
       scheduleNextMidnight();
     });

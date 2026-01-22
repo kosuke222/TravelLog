@@ -149,10 +149,6 @@
             }
           }
 
-          if (window.__refreshScheduleDetailsPending && window.__refreshScheduleDetails) {
-            window.__refreshScheduleDetails();
-            window.__refreshScheduleDetailsPending = false;
-          }
         };
 
         if (document.readyState === "loading") {
@@ -401,7 +397,7 @@
         <input type="hidden" name="photo_id" id="schedule-photo-delete-id" />
         <input type="hidden" name="photo_url" id="schedule-photo-delete-url" />
         <input type="hidden" name="schedule_id" id="schedule-photo-delete-schedule" />
-        <button class="button danger" type="submit">写真を削除</button>
+        <button class="button danger" type="submit" data-confirm="false">写真を削除</button>
       </form>
     </div>
   </div>
@@ -444,15 +440,6 @@
               if (searchLink) {
                 searchLink.href = `https://www.google.com/search?q=${encodeURIComponent(details.name)}`;
               }
-              if (details.photos && card) {
-                const imgs = Array.from(card.querySelectorAll("img.place-photo[data-google-photo='1']"));
-                imgs.forEach((img) => {
-                  const idx = Number(img.dataset.photoIndex || "0");
-                  const photo = details.photos[idx];
-                  if (!photo) return;
-                  img.src = photo.getUrl({ maxWidth: 600, maxHeight: 400 });
-                });
-              }
               return;
             }
             const fallback = el.dataset.fallback || "";
@@ -468,6 +455,32 @@
       } else {
         window.__refreshScheduleDetailsPending = true;
       }
+
+      const extractPhotoReference = (url) => {
+        if (!url) return "";
+        const refParam = url.match(/[?&]photo_reference=([^&]+)/);
+        if (refParam && refParam[1]) {
+          return decodeURIComponent(refParam[1]);
+        }
+        const refLegacy = url.match(/[?&]1s([^&]+)/);
+        if (refLegacy && refLegacy[1]) {
+          return decodeURIComponent(refLegacy[1]);
+        }
+        return "";
+      };
+
+      const refreshSchedulePhotos = () => {
+        const apiKey = "{{ google_maps_api_key or '' }}";
+        if (!apiKey) return;
+        const imgs = Array.from(document.querySelectorAll("img.place-photo[data-google-photo='1']"));
+        imgs.forEach((img) => {
+          const storedUrl = img.dataset.photoUrl || "";
+          const ref = extractPhotoReference(storedUrl);
+          if (!ref) return;
+          img.src = `https://maps.googleapis.com/maps/api/place/photo?maxwidth=600&photo_reference=${encodeURIComponent(ref)}&key=${apiKey}`;
+        });
+      };
+      refreshSchedulePhotos();
 
       const modal = document.getElementById("schedule-photo-modal");
       const modalClose = document.getElementById("schedule-photo-modal-close");

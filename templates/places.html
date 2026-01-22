@@ -171,10 +171,6 @@
             }
           }
 
-          if (window.__refreshPlacePhotosPending && window.__refreshPlacePhotos) {
-            window.__refreshPlacePhotos();
-            window.__refreshPlacePhotosPending = false;
-          }
         };
 
         if (document.readyState === "loading") {
@@ -370,7 +366,7 @@
         <input type="hidden" name="photo_url" id="photo-delete-url" />
         <input type="hidden" name="place_id" id="photo-delete-place" />
         <input type="hidden" name="category" value="{{ active_category }}" />
-        <button class="button danger" type="submit">写真を削除</button>
+        <button class="button danger" type="submit" data-confirm="false">写真を削除</button>
       </form>
     </div>
   </div>
@@ -474,32 +470,32 @@
         });
       }
 
+      const extractPhotoReference = (url) => {
+        if (!url) return "";
+        const refParam = url.match(/[?&]photo_reference=([^&]+)/);
+        if (refParam && refParam[1]) {
+          return decodeURIComponent(refParam[1]);
+        }
+        const refLegacy = url.match(/[?&]1s([^&]+)/);
+        if (refLegacy && refLegacy[1]) {
+          return decodeURIComponent(refLegacy[1]);
+        }
+        return "";
+      };
+
       const refreshPlacePhotos = () => {
-        const detailsService = new google.maps.places.PlacesService(document.createElement("div"));
-        const photoCards = Array.from(document.querySelectorAll(".place-card[data-place-id]"));
-        photoCards.forEach((card) => {
-          const placeId = card.dataset.placeId;
-          const imgs = Array.from(card.querySelectorAll("img.place-photo[data-google-photo='1']"));
-          if (!placeId || !imgs.length) return;
-          detailsService.getDetails({ placeId, fields: ["photos"] }, (details, status) => {
-            if (status !== google.maps.places.PlacesServiceStatus.OK || !details?.photos) {
-              return;
-            }
-            imgs.forEach((img) => {
-              const idx = Number(img.dataset.photoIndex || "0");
-              const photo = details.photos[idx];
-              if (!photo) return;
-              img.src = photo.getUrl({ maxWidth: 600, maxHeight: 400 });
-            });
-          });
+        const apiKey = "{{ google_maps_api_key or '' }}";
+        if (!apiKey) return;
+        const imgs = Array.from(document.querySelectorAll("img.place-photo[data-google-photo='1']"));
+        imgs.forEach((img) => {
+          const storedUrl = img.dataset.photoUrl || "";
+          const ref = extractPhotoReference(storedUrl);
+          if (!ref) return;
+          img.src = `https://maps.googleapis.com/maps/api/place/photo?maxwidth=600&photo_reference=${encodeURIComponent(ref)}&key=${apiKey}`;
         });
       };
       window.__refreshPlacePhotos = refreshPlacePhotos;
-      if (window.google && google.maps && google.maps.places) {
-        refreshPlacePhotos();
-      } else {
-        window.__refreshPlacePhotosPending = true;
-      }
+      refreshPlacePhotos();
     });
   </script>
 {% endblock %}
