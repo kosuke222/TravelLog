@@ -32,19 +32,48 @@
       <span>遊びと管理をひとつに。</span>
     </footer>
 
+    <div class="confirm-modal is-hidden" id="confirm-modal" role="dialog" aria-modal="true">
+      <div class="confirm-card">
+        <p>削除してもよろしいですか？</p>
+        <div class="confirm-actions">
+          <button class="button ghost" type="button" id="confirm-cancel">キャンセル</button>
+          <button class="button danger" type="button" id="confirm-ok">削除</button>
+        </div>
+      </div>
+    </div>
+
     <script>
       document.addEventListener("DOMContentLoaded", () => {
         const dangerButtons = document.querySelectorAll("form button.button.danger");
+        const confirmModal = document.getElementById("confirm-modal");
+        const confirmCancel = document.getElementById("confirm-cancel");
+        const confirmOk = document.getElementById("confirm-ok");
+        let pendingForm = null;
         dangerButtons.forEach((button) => {
           const form = button.closest("form");
           if (!form) return;
           form.addEventListener("submit", (event) => {
-            const ok = window.confirm("\u524a\u9664\u3057\u3066\u3082\u3088\u308d\u3057\u3044\u3067\u3059\u304b\uFF1F");
-            if (!ok) {
-              event.preventDefault();
-            }
+            if (!confirmModal) return;
+            event.preventDefault();
+            pendingForm = form;
+            confirmModal.classList.remove("is-hidden");
           });
         });
+        if (confirmCancel && confirmModal) {
+          confirmCancel.addEventListener("click", () => {
+            pendingForm = null;
+            confirmModal.classList.add("is-hidden");
+          });
+        }
+        if (confirmOk && confirmModal) {
+          confirmOk.addEventListener("click", () => {
+            if (pendingForm) {
+              pendingForm.submit();
+              pendingForm = null;
+            }
+            confirmModal.classList.add("is-hidden");
+          });
+        }
 
         const revealButton = document.querySelector(".image-reveal");
         const nextButton = document.querySelector(".image-next");
@@ -56,22 +85,9 @@
             }
           });
           nextButton.addEventListener("click", () => {
-            const heroImage = document.querySelector(".card-image-top[data-images]");
-            if (!heroImage) return;
-            let images = [];
-            try {
-              images = JSON.parse(heroImage.dataset.images || "[]");
-            } catch (e) {
-              images = [];
+            if (typeof window.__applyDailyImage === "function") {
+              window.__applyDailyImage();
             }
-            if (!images.length) return;
-            const currentIndex = Number(heroImage.dataset.currentIndex || "0");
-            const nextIndex = (currentIndex + 1) % images.length;
-            heroImage.dataset.currentIndex = String(nextIndex);
-            heroImage.src = images[nextIndex];
-            const today = new Date().toISOString().slice(0, 10);
-            window.localStorage.setItem("heroImageIndex", String(nextIndex));
-            window.localStorage.setItem("heroImageDate", today);
           });
         }
       });

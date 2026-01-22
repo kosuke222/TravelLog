@@ -148,6 +148,11 @@
               });
             }
           }
+
+          if (window.__refreshScheduleDetailsPending && window.__refreshScheduleDetails) {
+            window.__refreshScheduleDetails();
+            window.__refreshScheduleDetailsPending = false;
+          }
         };
 
         if (document.readyState === "loading") {
@@ -247,6 +252,7 @@
         <li class="item-row schedule-card"
             data-lat="{{ item['lat'] or '' }}"
             data-lng="{{ item['lng'] or '' }}"
+            data-place-id="{{ item['place_id'] or '' }}"
             data-title="{{ item['title'] }}"
             data-address="{{ item['address'] or '' }}"
             data-google-url="{{ item['google_url'] or '' }}">
@@ -272,12 +278,15 @@
               <div class="photo-shell">
                 <div class="photo-scroller">
                   {% for photo in photos[:3] %}
+                    {% set is_google = 'googleusercontent.com' in photo['url'] or 'maps.googleapis.com' in photo['url'] %}
                     <img class="place-photo"
                          src="{{ photo['url'] }}"
                          alt="{{ item['title'] }}"
                          data-photo-id="{{ photo['id'] or '' }}"
                          data-photo-url="{{ photo['url'] }}"
-                         data-schedule-id="{{ item['id'] }}" />
+                         data-schedule-id="{{ item['id'] }}"
+                         data-photo-index="{{ loop.index0 }}"
+                         data-google-photo="{{ '1' if is_google else '' }}" />
                   {% endfor %}
                 </div>
               </div>
@@ -317,6 +326,7 @@
         <li class="item-row schedule-card"
             data-lat="{{ item['lat'] or '' }}"
             data-lng="{{ item['lng'] or '' }}"
+            data-place-id="{{ item['place_id'] or '' }}"
             data-title="{{ item['title'] }}"
             data-address="{{ item['address'] or '' }}"
             data-google-url="{{ item['google_url'] or '' }}">
@@ -342,12 +352,15 @@
               <div class="photo-shell">
                 <div class="photo-scroller">
                   {% for photo in photos[:3] %}
+                    {% set is_google = 'googleusercontent.com' in photo['url'] or 'maps.googleapis.com' in photo['url'] %}
                     <img class="place-photo"
                          src="{{ photo['url'] }}"
                          alt="{{ item['title'] }}"
                          data-photo-id="{{ photo['id'] or '' }}"
                          data-photo-url="{{ photo['url'] }}"
-                         data-schedule-id="{{ item['id'] }}" />
+                         data-schedule-id="{{ item['id'] }}"
+                         data-photo-index="{{ loop.index0 }}"
+                         data-google-photo="{{ '1' if is_google else '' }}" />
                   {% endfor %}
                 </div>
               </div>
@@ -417,19 +430,28 @@
         });
       });
 
-      if (window.google && google.maps && google.maps.places) {
+      const refreshScheduleDetails = () => {
         const nameService = new google.maps.places.PlacesService(document.createElement("div"));
         const placeNameEls = document.querySelectorAll(".place-name[data-place-id]");
         placeNameEls.forEach((el) => {
           const placeId = el.dataset.placeId;
           if (!placeId) return;
-          nameService.getDetails({ placeId, fields: ["name"] }, (details, status) => {
+          nameService.getDetails({ placeId, fields: ["name", "photos"] }, (details, status) => {
             if (status === google.maps.places.PlacesServiceStatus.OK && details?.name) {
               el.textContent = details.name;
               const card = el.closest(".schedule-card");
               const searchLink = card?.querySelector(".search-link");
               if (searchLink) {
                 searchLink.href = `https://www.google.com/search?q=${encodeURIComponent(details.name)}`;
+              }
+              if (details.photos && card) {
+                const imgs = Array.from(card.querySelectorAll("img.place-photo[data-google-photo='1']"));
+                imgs.forEach((img) => {
+                  const idx = Number(img.dataset.photoIndex || "0");
+                  const photo = details.photos[idx];
+                  if (!photo) return;
+                  img.src = photo.getUrl({ maxWidth: 600, maxHeight: 400 });
+                });
               }
               return;
             }
@@ -439,6 +461,12 @@
             }
           });
         });
+      };
+      window.__refreshScheduleDetails = refreshScheduleDetails;
+      if (window.google && google.maps && google.maps.places) {
+        refreshScheduleDetails();
+      } else {
+        window.__refreshScheduleDetailsPending = true;
       }
 
       const modal = document.getElementById("schedule-photo-modal");
