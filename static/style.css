@@ -538,6 +538,26 @@ body {
   resize: vertical;
 }
 
+.schedule-blocks {
+  display: grid;
+  gap: 16px;
+}
+
+.schedule-block {
+  padding: 14px;
+  border-radius: 14px;
+  border: 1px dashed rgba(203, 178, 122, 0.6);
+  background: rgba(255, 255, 255, 0.65);
+  display: grid;
+  gap: 14px;
+}
+
+.schedule-actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
 .memo-card .card-header {
   display: flex;
   justify-content: space-between;
@@ -593,6 +613,47 @@ body {
   gap: 12px;
   max-width: 100%;
   overflow: visible;
+}
+
+.schedule-day {
+  display: grid;
+  gap: 14px;
+  padding: 16px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.75);
+  border: 1px solid rgba(203, 178, 122, 0.5);
+}
+
+.schedule-day-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.schedule-day-date {
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.schedule-day-count {
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.schedule-day-cards {
+  display: flex;
+  gap: 14px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-bottom: 6px;
+  scroll-snap-type: x mandatory;
+}
+
+.schedule-day-cards .schedule-card {
+  flex: 0 0 min(520px, 86vw);
+  width: min(520px, 86vw);
+  scroll-snap-align: start;
 }
 
 .item-row {
@@ -757,6 +818,13 @@ body {
   cursor: pointer;
 }
 
+.hours-toggle {
+  position: relative;
+  z-index: 1;
+  pointer-events: auto;
+  touch-action: manipulation;
+}
+
 .photo-modal {
   position: fixed;
   inset: 0;
@@ -837,6 +905,70 @@ body {
   margin: 6px 0 0;
   color: var(--muted);
   white-space: pre-wrap;
+}
+
+.timeline {
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px dashed rgba(203, 178, 122, 0.6);
+  display: grid;
+  gap: 12px;
+}
+
+.timeline-header {
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.timeline-form {
+  background: rgba(255, 255, 255, 0.7);
+  border: 1px solid rgba(203, 178, 122, 0.6);
+  border-radius: 12px;
+  padding: 12px;
+}
+
+.timeline-list {
+  display: grid;
+  gap: 12px;
+}
+
+.timeline-post {
+  background: rgba(255, 255, 255, 0.7);
+  border: 1px solid rgba(203, 178, 122, 0.6);
+  border-radius: 12px;
+  padding: 12px;
+  display: grid;
+  gap: 10px;
+}
+
+.timeline-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.timeline-time {
+  font-weight: 700;
+  color: var(--accent-deep);
+}
+
+.timeline-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.timeline-photo {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.timeline-photo .place-photo {
+  height: 160px;
+  width: 220px;
+  object-fit: cover;
 }
 
 .empty-state {

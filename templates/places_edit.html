@@ -38,10 +38,24 @@
           <div class="photo-shell">
             <div class="photo-scroller">
               {% if place["photo_url"] %}
-                <img class="place-photo preview" src="{{ place['photo_url'] }}" alt="{{ place['name'] }}" />
+                {% set raw_url = place["photo_url"] %}
+                {% if raw_url.startswith('google-ref:') and google_maps_api_key %}
+                  {% set ref = raw_url[11:] %}
+                  {% set display_url = 'https://maps.googleapis.com/maps/api/place/photo?maxwidth=600&photo_reference=' ~ ref ~ '&key=' ~ google_maps_api_key %}
+                {% else %}
+                  {% set display_url = raw_url %}
+                {% endif %}
+                <img class="place-photo preview" src="{{ display_url }}" alt="{{ place['name'] }}" />
               {% endif %}
               {% for photo in photos %}
-                <img class="place-photo preview" src="{{ photo['photo_url'] }}" alt="{{ place['name'] }}" />
+                {% set raw_url = photo['photo_url'] %}
+                {% if raw_url.startswith('google-ref:') and google_maps_api_key %}
+                  {% set ref = raw_url[11:] %}
+                  {% set display_url = 'https://maps.googleapis.com/maps/api/place/photo?maxwidth=600&photo_reference=' ~ ref ~ '&key=' ~ google_maps_api_key %}
+                {% else %}
+                  {% set display_url = raw_url %}
+                {% endif %}
+                <img class="place-photo preview" src="{{ display_url }}" alt="{{ place['name'] }}" />
               {% endfor %}
             </div>
           </div>

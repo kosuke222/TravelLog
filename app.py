@@ -5,6 +5,8 @@ import os
 import random
 import uuid
 import json
+import re
+from urllib.parse import unquote
 from werkzeug.utils import secure_filename
 from dotenv import load_dotenv
 
@@ -79,6 +81,41 @@ def parse_photo_urls(value):
     return [item for item in data if isinstance(item, str) and item]
 
 
+def parse_photo_refs(value):
+    if not value:
+        return []
+    try:
+        data = json.loads(value)
+    except json.JSONDecodeError:
+        return []
+    if not isinstance(data, list):
+        return []
+    return [item for item in data if isinstance(item, str) and item]
+
+
+def extract_photo_reference(url):
+    if not url:
+        return None
+    match = re.search(r"[?&]photo_reference=([^&]+)", url)
+    if match:
+        return unquote(match.group(1))
+    match = re.search(r"[?&]1s([^&]+)", url)
+    if match:
+        return unquote(match.group(1))
+    return None
+
+
+def normalize_photo_url(value):
+    if not value:
+        return None
+    if isinstance(value, str) and value.startswith("google-ref:"):
+        return value
+    ref = extract_photo_reference(value)
+    if ref:
+        return f"google-ref:{ref}"
+    return value
+
+
 def upload_place_photo(sb: Client, file_storage):
     if not file_storage or file_storage.filename == "":
         return None
@@ -108,6 +145,94 @@ def upload_place_photos(sb: Client, files):
         if url:
             urls.append(url)
     return urls
+
+
+def collect_post_entries(form, files, prefix="post"):
+    indices = set()
+    for key in form.keys():
+        if key.startswith(f"{prefix}_") and key.rsplit("_", 1)[-1].isdigit():
+            indices.add(int(key.rsplit("_", 1)[-1]))
+    for key in files.keys():
+        if key.startswith(f"{prefix}_photos_") and key.rsplit("_", 1)[-1].isdigit():
+            indices.add(int(key.rsplit("_", 1)[-1]))
+    entries = []
+    for index in sorted(indices):
+        time_value = form.get(f"{prefix}_time_{index}") or None
+        title = (form.get(f"{prefix}_title_{index}") or "").strip()
+        body = (form.get(f"{prefix}_body_{index}") or "").strip()
+        photo_files = files.getlist(f"{prefix}_photos_{index}")
+        if not (time_value or title or body or photo_files):
+            continue
+        entries.append(
+            {
+                "time": time_value,
+                "title": title,
+                "body": body,
+                "files": photo_files,
+            }
+        )
+    if entries:
+        return entries
+    time_value = form.get("time") or None
+    title = (form.get("title") or "").strip()
+    body = (form.get("body") or "").strip()
+    photo_files = files.getlist("post_photos")
+    if time_value or title or body or photo_files:
+        return [{"time": time_value, "title": title, "body": body, "files": photo_files}]
+    return []
+
+
+def collect_schedule_entries(form, files):
+    indices = set()
+    for key in form.keys():
+        if key.startswith("schedule_") and key.rsplit("_", 1)[-1].isdigit():
+            indices.add(int(key.rsplit("_", 1)[-1]))
+    for key in files.keys():
+        if key.startswith("schedule_photos_") and key.rsplit("_", 1)[-1].isdigit():
+            indices.add(int(key.rsplit("_", 1)[-1]))
+    entries = []
+    for index in sorted(indices):
+        title = (form.get(f"schedule_title_{index}") or "").strip()
+        schedule_date = (form.get(f"schedule_date_{index}") or "").strip()
+        detail = (form.get(f"schedule_detail_{index}") or "").strip()
+        place_id = form.get(f"schedule_place_id_{index}") or None
+        address = form.get(f"schedule_address_{index}") or None
+        lat = parse_float(form.get(f"schedule_lat_{index}"))
+        lng = parse_float(form.get(f"schedule_lng_{index}"))
+        photo_url = normalize_photo_url(form.get(f"schedule_photo_url_{index}") or None)
+        rating = parse_float(form.get(f"schedule_rating_{index}"))
+        user_ratings_total = form.get(f"schedule_user_ratings_total_{index}") or None
+        website = form.get(f"schedule_website_{index}") or None
+        phone = form.get(f"schedule_phone_{index}") or None
+        google_url = form.get(f"schedule_google_url_{index}") or None
+        opening_hours = form.get(f"schedule_opening_hours_{index}") or None
+        photo_urls = parse_photo_urls(form.get(f"schedule_photo_urls_{index}"))
+        photo_refs = parse_photo_refs(form.get(f"schedule_photo_refs_{index}"))
+        photo_files = files.getlist(f"schedule_photos_{index}")
+        if not (title or schedule_date or detail or address or place_id or photo_files):
+            continue
+        entries.append(
+            {
+                "title": title,
+                "date": schedule_date,
+                "detail": detail,
+                "place_id": place_id,
+                "address": address,
+                "lat": lat,
+                "lng": lng,
+                "photo_url": photo_url,
+                "rating": rating,
+                "user_ratings_total": user_ratings_total,
+                "website": website,
+                "phone": phone,
+                "google_url": google_url,
+                "opening_hours": opening_hours,
+                "photo_urls": photo_urls,
+                "photo_refs": photo_refs,
+                "photo_files": photo_files,
+            }
+        )
+    return entries
 
 
 @app.route("/")
@@ -221,7 +346,7 @@ def places():
         address = request.form.get("address") or None
         lat = parse_float(request.form.get("lat"))
         lng = parse_float(request.form.get("lng"))
-        photo_url = request.form.get("photo_url") or None
+        photo_url = normalize_photo_url(request.form.get("photo_url") or None)
         rating = parse_float(request.form.get("rating"))
         user_ratings_total = request.form.get("user_ratings_total") or None
         website = request.form.get("website") or None
@@ -254,9 +379,15 @@ def places():
                 .data
             )
             place_id = place[0]["id"] if place else None
-            google_photo_urls = parse_photo_urls(request.form.get("photo_urls"))
+            google_photo_refs = parse_photo_refs(request.form.get("photo_refs"))
+            if not google_photo_refs:
+                google_photo_urls = parse_photo_urls(request.form.get("photo_urls"))
+                google_photo_refs = [
+                    ref for ref in (extract_photo_reference(url) for url in google_photo_urls) if ref
+                ]
+            google_photo_entries = [f"google-ref:{ref}" for ref in google_photo_refs]
             photo_urls = upload_place_photos(sb, request.files.getlist("photos"))
-            all_photo_urls = google_photo_urls + photo_urls
+            all_photo_urls = google_photo_entries + photo_urls
             if place_id and all_photo_urls:
                 sb.table("place_photos").insert(
                     [
@@ -349,6 +480,7 @@ def places_edit(place_id):
         place=data[0],
         photos=photos,
         categories=PLACE_CATEGORIES,
+        google_maps_api_key=os.getenv("GOOGLE_MAPS_API_KEY"),
     )
 
 
@@ -362,7 +494,7 @@ def places_update(place_id):
     address = request.form.get("address") or None
     lat = parse_float(request.form.get("lat"))
     lng = parse_float(request.form.get("lng"))
-    photo_url = request.form.get("photo_url") or None
+    photo_url = normalize_photo_url(request.form.get("photo_url") or None)
     rating = parse_float(request.form.get("rating"))
     user_ratings_total = request.form.get("user_ratings_total") or None
     website = request.form.get("website") or None
@@ -387,9 +519,15 @@ def places_update(place_id):
             "opening_hours": opening_hours,
         }
         sb.table("places").update(payload).eq("id", place_id).execute()
-        google_photo_urls = parse_photo_urls(request.form.get("photo_urls"))
+        google_photo_refs = parse_photo_refs(request.form.get("photo_refs"))
+        if not google_photo_refs:
+            google_photo_urls = parse_photo_urls(request.form.get("photo_urls"))
+            google_photo_refs = [
+                ref for ref in (extract_photo_reference(url) for url in google_photo_urls) if ref
+            ]
+        google_photo_entries = [f"google-ref:{ref}" for ref in google_photo_refs]
         photo_urls = upload_place_photos(sb, request.files.getlist("photos"))
-        all_photo_urls = google_photo_urls + photo_urls
+        all_photo_urls = google_photo_entries + photo_urls
         if all_photo_urls:
             sb.table("place_photos").insert(
                 [
@@ -435,40 +573,28 @@ def places_photo_delete():
 @app.route("/schedule", methods=["GET", "POST"])
 def schedule():
     sb = get_supabase()
+    api_key = os.getenv("GOOGLE_MAPS_API_KEY")
     if request.method == "POST":
-        title = request.form.get("title", "").strip()
-        schedule_date = request.form.get("date", "").strip()
-        detail = request.form.get("detail", "").strip()
-        place_id = request.form.get("place_id") or None
-        address = request.form.get("address") or None
-        lat = parse_float(request.form.get("lat"))
-        lng = parse_float(request.form.get("lng"))
-        photo_url = request.form.get("photo_url") or None
-        rating = parse_float(request.form.get("rating"))
-        user_ratings_total = request.form.get("user_ratings_total") or None
-        website = request.form.get("website") or None
-        phone = request.form.get("phone") or None
-        google_url = request.form.get("google_url") or None
-        opening_hours = request.form.get("opening_hours") or None
-        if title or schedule_date or detail or address:
+        schedule_entries = collect_schedule_entries(request.form, request.files)
+        for entry in schedule_entries:
             schedule_row = (
                 sb.table("schedules")
                 .insert(
                     {
-                        "title": title or "予定",
-                        "date": schedule_date,
-                        "detail": detail,
-                        "place_id": place_id,
-                        "address": address,
-                        "lat": lat,
-                        "lng": lng,
-                        "photo_url": photo_url,
-                        "rating": rating,
-                        "user_ratings_total": user_ratings_total,
-                        "website": website,
-                        "phone": phone,
-                        "google_url": google_url,
-                        "opening_hours": opening_hours,
+                        "title": entry["title"] or "??",
+                        "date": entry["date"],
+                        "detail": entry["detail"],
+                        "place_id": entry["place_id"],
+                        "address": entry["address"],
+                        "lat": entry["lat"],
+                        "lng": entry["lng"],
+                        "photo_url": entry["photo_url"],
+                        "rating": entry["rating"],
+                        "user_ratings_total": entry["user_ratings_total"],
+                        "website": entry["website"],
+                        "phone": entry["phone"],
+                        "google_url": entry["google_url"],
+                        "opening_hours": entry["opening_hours"],
                         "created_at": now_str(),
                     }
                 )
@@ -476,10 +602,17 @@ def schedule():
                 .data
             )
             schedule_id = schedule_row[0]["id"] if schedule_row else None
-            google_photo_urls = parse_photo_urls(request.form.get("photo_urls"))
-            photo_urls = upload_place_photos(sb, request.files.getlist("photos"))
-            all_photo_urls = google_photo_urls + photo_urls
-            if schedule_id and all_photo_urls:
+            if not schedule_id:
+                continue
+            google_photo_refs = entry["photo_refs"]
+            if not google_photo_refs:
+                google_photo_refs = [
+                    ref for ref in (extract_photo_reference(url) for url in entry["photo_urls"]) if ref
+                ]
+            google_photo_entries = [f"google-ref:{ref}" for ref in google_photo_refs]
+            photo_urls = upload_place_photos(sb, entry["photo_files"])
+            all_photo_urls = (google_photo_entries + photo_urls)[:3]
+            if all_photo_urls:
                 sb.table("schedule_photos").insert(
                     [
                         {
@@ -491,6 +624,48 @@ def schedule():
                     ]
                 ).execute()
         return redirect(url_for("schedule"))
+
+    def post_sort_key(post):
+        time_value = post.get("time")
+        if time_value:
+            return (0, time_value, post.get("id") or 0)
+        return (1, post.get("id") or 0)
+
+    def group_schedules_by_date(schedules):
+        groups = []
+        by_key = {}
+        for item in schedules:
+            date_value = item.get("date") or ""
+            if date_value:
+                date_key = date_value
+                date_label = date_value
+            else:
+                date_key = "undated"
+                date_label = "日付未設定"
+            if date_key not in by_key:
+                group = {
+                    "date_key": date_key,
+                    "date_label": date_label,
+                    "items": [],
+                    "schedule_ids": [],
+                    "timeline_schedule_id": None,
+                    "form_id": "",
+                }
+                by_key[date_key] = group
+                groups.append(group)
+            group = by_key[date_key]
+            group["items"].append(item)
+            if item.get("id") is not None:
+                group["schedule_ids"].append(item["id"])
+        for group in groups:
+            if group["schedule_ids"]:
+                timeline_id = group["schedule_ids"][0]
+                group["timeline_schedule_id"] = timeline_id
+                group["form_id"] = f"{group['date_key'].replace('-', '')}-{timeline_id}"
+            else:
+                group["form_id"] = group["date_key"].replace("-", "") or "undated"
+        return groups
+
 
     schedules = (
         sb.table("schedules")
@@ -518,6 +693,8 @@ def schedule():
 
     schedule_ids = [row["id"] for row in (upcoming + past)]
     photos_by_schedule = {}
+    posts_by_schedule = {}
+    post_photos_by_post = {}
     if schedule_ids:
         photos = (
             sb.table("schedule_photos")
@@ -527,10 +704,52 @@ def schedule():
             .execute()
             .data
         )
+        def build_schedule_photo_entry(photo_row):
+            raw_url = photo_row.get("photo_url") or ""
+            ref = ""
+            if raw_url.startswith("google-ref:"):
+                ref = raw_url[11:]
+            else:
+                ref = extract_photo_reference(raw_url)
+            is_google = bool(ref) or ("googleusercontent.com" in raw_url or "maps.googleapis.com" in raw_url)
+            display_url = raw_url
+            if ref and api_key:
+                display_url = (
+                    "https://maps.googleapis.com/maps/api/place/photo"
+                    f"?maxwidth=600&photo_reference={ref}&key={api_key}"
+                )
+            return {
+                "id": photo_row.get("id"),
+                "url": raw_url,
+                "display_url": display_url,
+                "is_google": is_google,
+            }
         for photo in photos:
             photos_by_schedule.setdefault(photo["schedule_id"], []).append(
-                {"id": photo["id"], "url": photo["photo_url"]}
+                build_schedule_photo_entry(photo)
             )
+        posts = (
+            sb.table("schedule_posts")
+            .select("id, schedule_id, time, title, body, created_at")
+            .in_("schedule_id", schedule_ids)
+            .order("id", desc=False)
+            .execute()
+            .data
+        )
+        for post in posts:
+            posts_by_schedule.setdefault(post["schedule_id"], []).append(post)
+        post_ids = [post["id"] for post in posts]
+        if post_ids:
+            post_photos = (
+                sb.table("schedule_post_photos")
+                .select("id, post_id, photo_url")
+                .in_("post_id", post_ids)
+                .order("id", desc=False)
+                .execute()
+                .data
+            )
+            for photo in post_photos:
+                post_photos_by_post.setdefault(photo["post_id"], []).append(photo)
     for row in schedules:
         schedule_photos = photos_by_schedule.get(row["id"], [])
         if schedule_photos:
@@ -541,13 +760,36 @@ def schedule():
                     continue
                 if url not in deduped or (deduped[url]["id"] is None and photo.get("id")):
                     deduped[url] = photo
-            photos_by_schedule[row["id"]] = list(deduped.values())
+            ordered = list(deduped.values())
+            if len(ordered) > 3:
+                excess_ids = [photo["id"] for photo in ordered[3:] if photo.get("id")]
+                if excess_ids:
+                    sb.table("schedule_photos").delete().in_("id", excess_ids).execute()
+                ordered = ordered[:3]
+            photos_by_schedule[row["id"]] = ordered
+        schedule_posts = posts_by_schedule.get(row["id"], [])
+        if schedule_posts:
+            posts_by_schedule[row["id"]] = sorted(schedule_posts, key=post_sort_key)
+
+    upcoming_groups = group_schedules_by_date(upcoming)
+    past_groups = group_schedules_by_date(past)
+    posts_by_date = {}
+    for group in upcoming_groups + past_groups:
+        group_posts = []
+        for schedule_id in group["schedule_ids"]:
+            group_posts.extend(posts_by_schedule.get(schedule_id, []))
+        if group_posts:
+            group_posts = sorted(group_posts, key=post_sort_key)
+        posts_by_date[group["date_key"]] = group_posts
     return render_template(
         "schedule.html",
-        upcoming_schedules=upcoming,
-        past_schedules=past,
+        upcoming_groups=upcoming_groups,
+        past_groups=past_groups,
         photos_by_schedule=photos_by_schedule,
-        google_maps_api_key=os.getenv("GOOGLE_MAPS_API_KEY"),
+        posts_by_schedule=posts_by_schedule,
+        posts_by_date=posts_by_date,
+        post_photos_by_post=post_photos_by_post,
+        google_maps_api_key=api_key,
     )
 
 
@@ -574,7 +816,12 @@ def schedule_edit(schedule_id):
         .execute()
         .data
     )
-    return render_template("schedule_edit.html", schedule=data[0], photos=photos)
+    return render_template(
+        "schedule_edit.html",
+        schedule=data[0],
+        photos=photos,
+        google_maps_api_key=os.getenv("GOOGLE_MAPS_API_KEY"),
+    )
 
 
 @app.post("/schedule/<int:schedule_id>/update")
@@ -587,7 +834,7 @@ def schedule_update(schedule_id):
     address = request.form.get("address") or None
     lat = parse_float(request.form.get("lat"))
     lng = parse_float(request.form.get("lng"))
-    photo_url = request.form.get("photo_url") or None
+    photo_url = normalize_photo_url(request.form.get("photo_url") or None)
     rating = parse_float(request.form.get("rating"))
     user_ratings_total = request.form.get("user_ratings_total") or None
     website = request.form.get("website") or None
@@ -613,9 +860,15 @@ def schedule_update(schedule_id):
                 "opening_hours": opening_hours,
             }
         ).eq("id", schedule_id).execute()
-        google_photo_urls = parse_photo_urls(request.form.get("photo_urls"))
+        google_photo_refs = parse_photo_refs(request.form.get("photo_refs"))
+        if not google_photo_refs:
+            google_photo_urls = parse_photo_urls(request.form.get("photo_urls"))
+            google_photo_refs = [
+                ref for ref in (extract_photo_reference(url) for url in google_photo_urls) if ref
+            ]
+        google_photo_entries = [f"google-ref:{ref}" for ref in google_photo_refs]
         photo_urls = upload_place_photos(sb, request.files.getlist("photos"))
-        all_photo_urls = google_photo_urls + photo_urls
+        all_photo_urls = google_photo_entries + photo_urls
         if all_photo_urls:
             sb.table("schedule_photos").insert(
                 [
@@ -627,6 +880,70 @@ def schedule_update(schedule_id):
                     for url in all_photo_urls
                 ]
             ).execute()
+    return redirect(url_for("schedule"))
+
+
+@app.post("/schedule/<int:schedule_id>/posts")
+def schedule_post_create(schedule_id):
+    sb = get_supabase()
+    post_entries = collect_post_entries(request.form, request.files, prefix="post")
+    if not post_entries:
+        return redirect(url_for("schedule"))
+    for entry in post_entries:
+        post = (
+            sb.table("schedule_posts")
+            .insert(
+                {
+                    "schedule_id": schedule_id,
+                    "time": entry["time"],
+                    "title": entry["title"],
+                    "body": entry["body"],
+                    "created_at": now_str(),
+                }
+            )
+            .execute()
+            .data
+        )
+        post_id = post[0]["id"] if post else None
+        photo_urls = upload_place_photos(sb, entry["files"])
+        if post_id and photo_urls:
+            sb.table("schedule_post_photos").insert(
+                [
+                    {
+                        "post_id": post_id,
+                        "photo_url": url,
+                        "created_at": now_str(),
+                    }
+                    for url in photo_urls
+                ]
+            ).execute()
+    return redirect(url_for("schedule"))
+
+
+@app.post("/schedule/post/<int:post_id>/delete")
+def schedule_post_delete(post_id):
+    sb = get_supabase()
+    sb.table("schedule_post_photos").delete().eq("post_id", post_id).execute()
+    sb.table("schedule_posts").delete().eq("id", post_id).execute()
+    return redirect(url_for("schedule"))
+
+
+@app.post("/schedule/post/photo/delete")
+def schedule_post_photo_delete():
+    sb = get_supabase()
+    photo_id = request.form.get("photo_id") or None
+    post_id = request.form.get("post_id") or None
+    photo_url = request.form.get("photo_url") or None
+    if photo_id and str(photo_id).isdigit():
+        photo_id = int(photo_id)
+    if post_id and str(post_id).isdigit():
+        post_id = int(post_id)
+    if photo_id:
+        sb.table("schedule_post_photos").delete().eq("id", photo_id).execute()
+    if post_id and photo_url:
+        sb.table("schedule_post_photos").delete().eq("post_id", post_id).eq(
+            "photo_url", photo_url
+        ).execute()
     return redirect(url_for("schedule"))
 
 

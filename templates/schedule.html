@@ -5,90 +5,135 @@
     <script>
       function initScheduleSearch() {
         const run = () => {
-          const input = document.getElementById("schedule-search-input");
-          const mapEl = document.getElementById("schedule-map");
+          const blocks = Array.from(document.querySelectorAll(".schedule-block"));
           const listMapEl = document.getElementById("schedule-list-map");
           const mapPanel = document.getElementById("schedule-map-panel");
           const mapClose = document.getElementById("schedule-map-close");
-          if (!input || !mapEl || !window.google || !google.maps || !google.maps.places) {
+          if (!window.google || !google.maps || !google.maps.places) {
             return;
           }
 
-          const autocomplete = new google.maps.places.Autocomplete(input, {
-            fields: [
-              "place_id",
-              "name",
-              "formatted_address",
-              "geometry",
-              "photos",
-              "types",
-              "rating",
-              "user_ratings_total",
-              "website",
-              "formatted_phone_number",
-              "url",
-              "opening_hours",
-            ],
-          });
-
-          const map = new google.maps.Map(mapEl, {
-            center: { lat: 35.6804, lng: 139.769 },
-            zoom: 12,
-          });
-
-          const marker = new google.maps.Marker({ map });
-
-          autocomplete.addListener("place_changed", () => {
-            const place = autocomplete.getPlace();
-            if (!place.geometry || !place.geometry.location) {
+          const initScheduleBlock = (block) => {
+            const input = block.querySelector(".schedule-search-input");
+            const mapEl = block.querySelector(".schedule-map");
+            if (!input || !mapEl) {
               return;
             }
 
-            map.setCenter(place.geometry.location);
-            map.setZoom(16);
-            marker.setPosition(place.geometry.location);
+            const autocomplete = new google.maps.places.Autocomplete(input, {
+              fields: [
+                "place_id",
+                "name",
+                "formatted_address",
+                "geometry",
+                "photos",
+                "types",
+                "rating",
+                "user_ratings_total",
+                "website",
+                "formatted_phone_number",
+                "url",
+                "opening_hours",
+              ],
+            });
 
-            document.getElementById("address").value = place.formatted_address || "";
-            document.getElementById("place_id").value = place.place_id || "";
-            document.getElementById("lat").value = place.geometry.location.lat();
-            document.getElementById("lng").value = place.geometry.location.lng();
+            const map = new google.maps.Map(mapEl, {
+              center: { lat: 35.6804, lng: 139.769 },
+              zoom: 12,
+            });
 
-            const previewImg = document.getElementById("schedule-photo-preview");
-            const previewMore = document.getElementById("schedule-photo-more");
-            const previewCount = document.getElementById("schedule-photo-count");
-            let photoUrl = "";
-            let photoUrls = [];
-            if (place.photos && place.photos.length > 0) {
-              photoUrls = place.photos.slice(0, 6).map((photo) =>
-                photo.getUrl({ maxWidth: 600, maxHeight: 400 })
-              );
-              photoUrl = photoUrls[0] || "";
-              previewImg.src = photoUrl;
-              previewImg.classList.remove("is-hidden");
-              if (photoUrls.length > 1) {
-                previewCount.textContent = String(photoUrls.length);
-                previewMore.dataset.photos = JSON.stringify(photoUrls);
-                previewMore.classList.remove("is-hidden");
-              } else {
-                previewMore.classList.add("is-hidden");
+            const marker = new google.maps.Marker({ map });
+
+            autocomplete.addListener("place_changed", () => {
+              const place = autocomplete.getPlace();
+              if (!place.geometry || !place.geometry.location) {
+                return;
               }
-            } else {
-              previewImg.classList.add("is-hidden");
-              previewMore.classList.add("is-hidden");
-            }
-            document.getElementById("photo_url").value = photoUrl;
-            document.getElementById("photo_urls").value = JSON.stringify(photoUrls);
 
-            document.getElementById("rating").value = place.rating || "";
-            document.getElementById("user_ratings_total").value = place.user_ratings_total || "";
-            document.getElementById("website").value = place.website || "";
-            document.getElementById("phone").value = place.formatted_phone_number || "";
-            document.getElementById("google_url").value = place.url || "";
-            const hours = place.opening_hours && place.opening_hours.weekday_text
-              ? place.opening_hours.weekday_text.join("\n")
-              : "";
-            document.getElementById("opening_hours").value = hours;
+              map.setCenter(place.geometry.location);
+              map.setZoom(16);
+              marker.setPosition(place.geometry.location);
+
+              const address = block.querySelector(".schedule-address");
+              const placeId = block.querySelector(".schedule-place-id");
+              const lat = block.querySelector(".schedule-lat");
+              const lng = block.querySelector(".schedule-lng");
+              if (address) address.value = place.formatted_address || "";
+              if (placeId) placeId.value = place.place_id || "";
+              if (lat) lat.value = place.geometry.location.lat();
+              if (lng) lng.value = place.geometry.location.lng();
+
+              const previewImg = block.querySelector(".schedule-photo-preview");
+              const previewMore = block.querySelector(".schedule-photo-more");
+              const previewCount = block.querySelector(".schedule-photo-count");
+              let photoUrl = "";
+              let photoUrls = [];
+              if (place.photos && place.photos.length > 0) {
+                photoUrls = place.photos.slice(0, 6).map((photo) =>
+                  photo.getUrl({ maxWidth: 600, maxHeight: 400 })
+                );
+                photoUrl = photoUrls[0] || "";
+                if (previewImg) {
+                  previewImg.src = photoUrl;
+                  previewImg.classList.remove("is-hidden");
+                }
+                if (previewMore && previewCount) {
+                  if (photoUrls.length > 1) {
+                    previewCount.textContent = String(photoUrls.length);
+                    previewMore.dataset.photos = JSON.stringify(photoUrls);
+                    previewMore.classList.remove("is-hidden");
+                  } else {
+                    previewMore.classList.add("is-hidden");
+                  }
+                }
+              } else {
+                if (previewImg) previewImg.classList.add("is-hidden");
+                if (previewMore) previewMore.classList.add("is-hidden");
+              }
+              const extractPhotoRef = (url) => {
+                const refParam = url.match(/[?&]photo_reference=([^&]+)/);
+                if (refParam && refParam[1]) return decodeURIComponent(refParam[1]);
+                const refLegacy = url.match(/[?&]1s([^&]+)/);
+                if (refLegacy && refLegacy[1]) return decodeURIComponent(refLegacy[1]);
+                return "";
+              };
+              const photoRefs = photoUrls.map((url) => extractPhotoRef(url)).filter((ref) => ref);
+
+              const photoUrlInput = block.querySelector(".schedule-photo-url");
+              const photoUrlsInput = block.querySelector(".schedule-photo-urls");
+              const photoRefsInput = block.querySelector(".schedule-photo-refs");
+              if (photoUrlInput) photoUrlInput.value = photoUrl;
+              if (photoUrlsInput) photoUrlsInput.value = JSON.stringify(photoUrls);
+              if (photoRefsInput) photoRefsInput.value = JSON.stringify(photoRefs);
+
+              const rating = block.querySelector(".schedule-rating");
+              const userRatingsTotal = block.querySelector(".schedule-user-ratings-total");
+              const website = block.querySelector(".schedule-website");
+              const phone = block.querySelector(".schedule-phone");
+              const googleUrl = block.querySelector(".schedule-google-url");
+              const openingHours = block.querySelector(".schedule-opening-hours");
+              if (rating) rating.value = place.rating || "";
+              if (userRatingsTotal) userRatingsTotal.value = place.user_ratings_total || "";
+              if (website) website.value = place.website || "";
+              if (phone) phone.value = place.formatted_phone_number || "";
+              if (googleUrl) googleUrl.value = place.url || "";
+              const hours = place.opening_hours && place.opening_hours.weekday_text
+                ? place.opening_hours.weekday_text.join("\n")
+                : "";
+              if (openingHours) openingHours.value = hours;
+            });
+          };
+
+          blocks.forEach((block) => {
+            initScheduleBlock(block);
           });
+          window.__initScheduleBlock = initScheduleBlock;
+          if (Array.isArray(window.__pendingScheduleBlocks) && window.__pendingScheduleBlocks.length) {
+            window.__pendingScheduleBlocks.forEach((block) => {
+              initScheduleBlock(block);
+            });
+            window.__pendingScheduleBlocks = [];
+          }
 
           if (listMapEl && mapPanel) {
             const listMap = new google.maps.Map(listMapEl, {
@@ -124,10 +169,11 @@
                 if (event.target.closest("a, button, form")) {
                   return;
                 }
-                if (mapPanel.parentElement !== card.parentElement) {
-                  card.parentElement.insertBefore(mapPanel, card);
-                } else if (mapPanel.nextElementSibling !== card) {
-                  card.parentElement.insertBefore(mapPanel, card);
+                const day = card.closest(".schedule-day");
+                const target = day || card;
+                const list = target.parentElement;
+                if (list && (mapPanel.parentElement !== list || mapPanel.nextElementSibling !== target)) {
+                  list.insertBefore(mapPanel, target);
                 }
                 mapPanel.classList.add("is-visible");
                 listMap.setCenter(position);
@@ -171,65 +217,72 @@
     <div>
       <p class="eyebrow">Schedule</p>
       <h1>予定</h1>
-      <p class="lead">日付ごとの予定とデートプランをまとめる。</p>
+      <p class="lead">日付ごとの予定とタイムラインをまとめる</p>
     </div>
   </section>
 
   <section class="panel form-panel is-collapsed" id="schedule-form-panel">
     <form method="post" class="form-grid" enctype="multipart/form-data" id="schedule-form">
-      <div>
-        <label for="title">予定</label>
-        <input id="title" name="title" type="text" placeholder="例: 映画とディナー" />
-      </div>
-      <div>
-        <label for="date">日付</label>
-        <input id="date" name="date" type="date" />
-      </div>
-      <div>
-        <label for="detail">デートプラン詳細</label>
-        <textarea id="detail" name="detail" placeholder="時間配分や過ごし方"></textarea>
-      </div>
-      <div>
-        <label for="schedule-search-input">場所を検索</label>
-        <input id="schedule-search-input" type="text" placeholder="例: 代々木公園" autocomplete="off" />
-      </div>
-      <div>
-        <label for="address">住所</label>
-        <input id="address" name="address" type="text" />
-      </div>
-      <div>
-        <label>マッププレビュー</label>
-        <div id="schedule-map" class="map-preview"></div>
-      </div>
-      <div>
-        <label>写真プレビュー</label>
-        <div class="preview-row">
-          <img id="schedule-photo-preview" class="place-photo preview is-hidden" alt="プレビュー" />
-          <button type="button" id="schedule-photo-more" class="preview-more is-hidden">
-            <span>+</span>
-            <span id="schedule-photo-count">0</span>
-          </button>
+      <div class="schedule-blocks" data-next-index="1">
+        <div class="schedule-block" data-index="0">
+          <div>
+            <label for="schedule-title-0">タイトル</label>
+            <input id="schedule-title-0" name="schedule_title_0" type="text" placeholder="例: 東京ドライブ" class="schedule-title" data-field="title" />
+          </div>
+          <div>
+            <label for="schedule-date-0">日付</label>
+            <input id="schedule-date-0" name="schedule_date_0" type="date" class="schedule-date" data-field="date" />
+          </div>
+          <div>
+            <label for="schedule-detail-0">メモ</label>
+            <textarea id="schedule-detail-0" name="schedule_detail_0" placeholder="予定のメモ" class="schedule-detail" data-field="detail"></textarea>
+          </div>
+          <div>
+            <label for="schedule-search-input-0">場所を検索</label>
+            <input id="schedule-search-input-0" name="schedule_search_0" type="text" placeholder="例: 東京タワー" autocomplete="off" class="schedule-search-input" data-field="search" />
+          </div>
+          <div>
+            <label for="schedule-address-0">住所</label>
+            <input id="schedule-address-0" name="schedule_address_0" type="text" class="schedule-address" data-field="address" />
+          </div>
+          <div>
+            <label>地図プレビュー</label>
+            <div id="schedule-map-0" class="map-preview schedule-map" data-field="map"></div>
+          </div>
+          <div>
+            <label>写真プレビュー</label>
+            <div class="preview-row">
+              <img class="place-photo preview is-hidden schedule-photo-preview" alt="プレビュー" data-field="preview" />
+              <button type="button" class="preview-more is-hidden schedule-photo-more" data-field="more">
+                <span>+</span>
+                <span class="schedule-photo-count" data-field="count">0</span>
+              </button>
+            </div>
+          </div>
+          <div>
+            <label for="schedule-photos-0">写真を追加</label>
+            <input id="schedule-photos-0" name="schedule_photos_0" type="file" accept="image/*" multiple class="schedule-photos" data-field="photos" />
+          </div>
+
+          <input type="hidden" name="schedule_place_id_0" class="schedule-place-id" data-field="place_id" />
+          <input type="hidden" name="schedule_lat_0" class="schedule-lat" data-field="lat" />
+          <input type="hidden" name="schedule_lng_0" class="schedule-lng" data-field="lng" />
+          <input type="hidden" name="schedule_photo_url_0" class="schedule-photo-url" data-field="photo_url" />
+          <input type="hidden" name="schedule_photo_urls_0" class="schedule-photo-urls" data-field="photo_urls" />
+          <input type="hidden" name="schedule_photo_refs_0" class="schedule-photo-refs" data-field="photo_refs" />
+          <input type="hidden" name="schedule_rating_0" class="schedule-rating" data-field="rating" />
+          <input type="hidden" name="schedule_user_ratings_total_0" class="schedule-user-ratings-total" data-field="user_ratings_total" />
+          <input type="hidden" name="schedule_website_0" class="schedule-website" data-field="website" />
+          <input type="hidden" name="schedule_phone_0" class="schedule-phone" data-field="phone" />
+          <input type="hidden" name="schedule_google_url_0" class="schedule-google-url" data-field="google_url" />
+          <input type="hidden" name="schedule_opening_hours_0" class="schedule-opening-hours" data-field="opening_hours" />
         </div>
       </div>
-      <div>
-        <label for="photos">写真（追加アップロード）</label>
-        <input id="photos" name="photos" type="file" accept="image/*" multiple />
+      <div class="schedule-actions">
+        <button class="button ghost schedule-add" type="button">予定を追加</button>
+        <button class="button primary" type="submit">予定を保存</button>
       </div>
-
-      <input type="hidden" id="place_id" name="place_id" />
-      <input type="hidden" id="lat" name="lat" />
-      <input type="hidden" id="lng" name="lng" />
-      <input type="hidden" id="photo_url" name="photo_url" />
-      <input type="hidden" id="photo_urls" name="photo_urls" />
-      <input type="hidden" id="rating" name="rating" />
-      <input type="hidden" id="user_ratings_total" name="user_ratings_total" />
-      <input type="hidden" id="website" name="website" />
-      <input type="hidden" id="phone" name="phone" />
-      <input type="hidden" id="google_url" name="google_url" />
-      <input type="hidden" id="opening_hours" name="opening_hours" />
-
-      <button class="button primary" type="submit">追加する</button>
-    </form>
+</form>
   </section>
 
   <section class="panel">
@@ -244,72 +297,79 @@
         </div>
         <div id="schedule-list-map" class="map-preview"></div>
       </li>
-      {% for item in upcoming_schedules %}
-        <li class="item-row schedule-card"
-            data-lat="{{ item['lat'] or '' }}"
-            data-lng="{{ item['lng'] or '' }}"
-            data-place-id="{{ item['place_id'] or '' }}"
-            data-title="{{ item['title'] }}"
-            data-address="{{ item['address'] or '' }}"
-            data-google-url="{{ item['google_url'] or '' }}">
-          <div class="item-main">
-            <strong>{{ item["title"] }}</strong>
-            <span class="meta">{{ item["date"] }}</span>
-            {% if item["place_id"] %}
-              <div class="meta place-name"
-                   data-place-id="{{ item['place_id'] }}"
-                   data-fallback="{{ item['address'] or '' }}">{{ item["address"] or "場所名" }}</div>
-            {% elif item["address"] %}
-              <div class="meta">{{ item["address"] }}</div>
-            {% endif %}
-            {% if item["opening_hours"] %}
-              <button type="button" class="button ghost hours-toggle">営業時間を見る</button>
-              <div class="note is-hidden hours-details">{{ item["opening_hours"] }}</div>
-            {% endif %}
-            {% if item["detail"] %}
-              <div class="note">{{ item["detail"] }}</div>
-            {% endif %}
-            {% set photos = photos_by_schedule.get(item["id"], []) %}
-            {% if photos %}
-              <div class="photo-shell">
-                <div class="photo-scroller">
-                  {% for photo in photos[:3] %}
-                    {% set is_google = 'googleusercontent.com' in photo['url'] or 'maps.googleapis.com' in photo['url'] %}
-                    <img class="place-photo"
-                         src="{{ photo['url'] }}"
-                         alt="{{ item['title'] }}"
-                         data-photo-id="{{ photo['id'] or '' }}"
-                         data-photo-url="{{ photo['url'] }}"
-                         data-schedule-id="{{ item['id'] }}"
-                         data-photo-index="{{ loop.index0 }}"
-                         data-google-photo="{{ '1' if is_google else '' }}" />
-                  {% endfor %}
-                </div>
-              </div>
-            {% endif %}
+      {% for group in upcoming_groups %}
+        <li class="schedule-day">
+          <div class="schedule-day-header">
+            <strong class="schedule-day-date">{{ group["date_label"] }}</strong>
+            <span class="schedule-day-count">{{ group["items"] | length }}件</span>
           </div>
-          <div class="item-actions">
-            {% set search_query = (item["title"] or "") | urlencode %}
-            <a class="button ghost search-link"
-               href="https://www.google.com/search?q={{ search_query }}"
-               data-default-query="{{ item['title'] or '' }}"
-               target="_blank"
-               rel="noopener">検索</a>
-            {% if item["google_url"] %}
-              <a class="button ghost" href="{{ item['google_url'] }}" target="_blank" rel="noopener">地図</a>
-            {% endif %}
-            <a class="button ghost" href="{{ url_for('schedule_edit', schedule_id=item['id']) }}">編集</a>
-            <form method="post" action="{{ url_for('schedule_delete', schedule_id=item['id']) }}">
-              <button class="button danger" type="submit">削除</button>
-            </form>
+          <div class="schedule-day-cards">
+            {% for item in group["items"] %}
+              <article class="item-row schedule-card"
+                       data-lat="{{ item['lat'] or '' }}"
+                       data-lng="{{ item['lng'] or '' }}"
+                       data-place-id="{{ item['place_id'] or '' }}"
+                       data-title="{{ item['title'] }}"
+                       data-address="{{ item['address'] or '' }}"
+                       data-google-url="{{ item['google_url'] or '' }}">
+                <div class="item-main">
+                  <strong>{{ item["title"] }}</strong>
+                  <span class="meta">{{ item["date"] }}</span>
+                  {% if item["place_id"] %}
+                    <div class="meta place-name"
+                         data-place-id="{{ item['place_id'] }}"
+                         data-fallback="{{ item['address'] or '場所名' }}">{{ item["address"] or "場所名" }}</div>
+                  {% elif item["address"] %}
+                    <div class="meta">{{ item["address"] }}</div>
+                  {% endif %}
+                  {% if item["opening_hours"] %}
+                    <button type="button" class="button ghost hours-toggle">営業時間を見る</button>
+                    <div class="note is-hidden hours-details">{{ item["opening_hours"] }}</div>
+                  {% endif %}
+                  {% if item["detail"] %}
+                    <div class="note">{{ item["detail"] }}</div>
+                  {% endif %}
+                  {% set photos = photos_by_schedule.get(item["id"], []) %}
+                  {% if photos %}
+                    <div class="photo-shell">
+                      <div class="photo-scroller">
+                        {% for photo in photos[:3] %}
+                          <img class="place-photo"
+                               src="{{ photo['display_url'] }}"
+                               alt="{{ item['title'] }}"
+                               data-photo-id="{{ photo['id'] or '' }}"
+                               data-photo-url="{{ photo['url'] }}"
+                               data-schedule-id="{{ item['id'] }}"
+                               data-google-photo="{{ '1' if photo['is_google'] else '' }}" />
+                        {% endfor %}
+                      </div>
+                    </div>
+                  {% endif %}
+                </div>
+                <div class="item-actions">
+                  {% set search_query = (item["title"] or "") | urlencode %}
+                  <a class="button ghost search-link"
+                     href="https://www.google.com/search?q={{ search_query }}"
+                     data-default-query="{{ item['title'] or '' }}"
+                     target="_blank"
+                     rel="noopener">検索</a>
+                  {% if item["google_url"] %}
+                    <a class="button ghost" href="{{ item['google_url'] }}" target="_blank" rel="noopener">地図</a>
+                  {% endif %}
+                  <a class="button ghost" href="{{ url_for('schedule_edit', schedule_id=item['id']) }}">編集</a>
+                  <form method="post" action="{{ url_for('schedule_delete', schedule_id=item['id']) }}">
+                    <button class="button danger" type="submit">削除</button>
+                  </form>
+                </div>
+              </article>
+            {% endfor %}
           </div>
         </li>
       {% else %}
-        <li class="item-row empty-state">まだ予定がありません。</li>
+        <li class="item-row empty-state">まだ予定がありません</li>
       {% endfor %}
     </ul>
   </section>
-
   <section class="section-title">
     <h2>思い出</h2>
   </section>
@@ -318,72 +378,79 @@
     <div class="panel-header">
     </div>
     <ul class="item-list">
-      {% for item in past_schedules %}
-        <li class="item-row schedule-card"
-            data-lat="{{ item['lat'] or '' }}"
-            data-lng="{{ item['lng'] or '' }}"
-            data-place-id="{{ item['place_id'] or '' }}"
-            data-title="{{ item['title'] }}"
-            data-address="{{ item['address'] or '' }}"
-            data-google-url="{{ item['google_url'] or '' }}">
-          <div class="item-main">
-            <strong>{{ item["title"] }}</strong>
-            <span class="meta">{{ item["date"] }}</span>
-            {% if item["place_id"] %}
-              <div class="meta place-name"
-                   data-place-id="{{ item['place_id'] }}"
-                   data-fallback="{{ item['address'] or '' }}">{{ item["address"] or "場所名" }}</div>
-            {% elif item["address"] %}
-              <div class="meta">{{ item["address"] }}</div>
-            {% endif %}
-            {% if item["opening_hours"] %}
-              <button type="button" class="button ghost hours-toggle">営業時間を見る</button>
-              <div class="note is-hidden hours-details">{{ item["opening_hours"] }}</div>
-            {% endif %}
-            {% if item["detail"] %}
-              <div class="note">{{ item["detail"] }}</div>
-            {% endif %}
-            {% set photos = photos_by_schedule.get(item["id"], []) %}
-            {% if photos %}
-              <div class="photo-shell">
-                <div class="photo-scroller">
-                  {% for photo in photos[:3] %}
-                    {% set is_google = 'googleusercontent.com' in photo['url'] or 'maps.googleapis.com' in photo['url'] %}
-                    <img class="place-photo"
-                         src="{{ photo['url'] }}"
-                         alt="{{ item['title'] }}"
-                         data-photo-id="{{ photo['id'] or '' }}"
-                         data-photo-url="{{ photo['url'] }}"
-                         data-schedule-id="{{ item['id'] }}"
-                         data-photo-index="{{ loop.index0 }}"
-                         data-google-photo="{{ '1' if is_google else '' }}" />
-                  {% endfor %}
-                </div>
-              </div>
-            {% endif %}
+      {% for group in past_groups %}
+        <li class="schedule-day">
+          <div class="schedule-day-header">
+            <strong class="schedule-day-date">{{ group["date_label"] }}</strong>
+            <span class="schedule-day-count">{{ group["items"] | length }}件</span>
           </div>
-          <div class="item-actions">
-            {% set search_query = (item["title"] or "") | urlencode %}
-            <a class="button ghost search-link"
-               href="https://www.google.com/search?q={{ search_query }}"
-               data-default-query="{{ item['title'] or '' }}"
-               target="_blank"
-               rel="noopener">検索</a>
-            {% if item["google_url"] %}
-              <a class="button ghost" href="{{ item['google_url'] }}" target="_blank" rel="noopener">地図</a>
-            {% endif %}
-            <a class="button ghost" href="{{ url_for('schedule_edit', schedule_id=item['id']) }}">編集</a>
-            <form method="post" action="{{ url_for('schedule_delete', schedule_id=item['id']) }}">
-              <button class="button danger" type="submit">削除</button>
-            </form>
+          <div class="schedule-day-cards">
+            {% for item in group["items"] %}
+              <article class="item-row schedule-card"
+                       data-lat="{{ item['lat'] or '' }}"
+                       data-lng="{{ item['lng'] or '' }}"
+                       data-place-id="{{ item['place_id'] or '' }}"
+                       data-title="{{ item['title'] }}"
+                       data-address="{{ item['address'] or '' }}"
+                       data-google-url="{{ item['google_url'] or '' }}">
+                <div class="item-main">
+                  <strong>{{ item["title"] }}</strong>
+                  <span class="meta">{{ item["date"] }}</span>
+                  {% if item["place_id"] %}
+                    <div class="meta place-name"
+                         data-place-id="{{ item['place_id'] }}"
+                         data-fallback="{{ item['address'] or '場所名' }}">{{ item["address"] or "場所名" }}</div>
+                  {% elif item["address"] %}
+                    <div class="meta">{{ item["address"] }}</div>
+                  {% endif %}
+                  {% if item["opening_hours"] %}
+                    <button type="button" class="button ghost hours-toggle">営業時間を見る</button>
+                    <div class="note is-hidden hours-details">{{ item["opening_hours"] }}</div>
+                  {% endif %}
+                  {% if item["detail"] %}
+                    <div class="note">{{ item["detail"] }}</div>
+                  {% endif %}
+                  {% set photos = photos_by_schedule.get(item["id"], []) %}
+                  {% if photos %}
+                    <div class="photo-shell">
+                      <div class="photo-scroller">
+                        {% for photo in photos[:3] %}
+                          <img class="place-photo"
+                               src="{{ photo['display_url'] }}"
+                               alt="{{ item['title'] }}"
+                               data-photo-id="{{ photo['id'] or '' }}"
+                               data-photo-url="{{ photo['url'] }}"
+                               data-schedule-id="{{ item['id'] }}"
+                               data-google-photo="{{ '1' if photo['is_google'] else '' }}" />
+                        {% endfor %}
+                      </div>
+                    </div>
+                  {% endif %}
+                </div>
+                <div class="item-actions">
+                  {% set search_query = (item["title"] or "") | urlencode %}
+                  <a class="button ghost search-link"
+                     href="https://www.google.com/search?q={{ search_query }}"
+                     data-default-query="{{ item['title'] or '' }}"
+                     target="_blank"
+                     rel="noopener">検索</a>
+                  {% if item["google_url"] %}
+                    <a class="button ghost" href="{{ item['google_url'] }}" target="_blank" rel="noopener">地図</a>
+                  {% endif %}
+                  <a class="button ghost" href="{{ url_for('schedule_edit', schedule_id=item['id']) }}">編集</a>
+                  <form method="post" action="{{ url_for('schedule_delete', schedule_id=item['id']) }}">
+                    <button class="button danger" type="submit">削除</button>
+                  </form>
+                </div>
+              </article>
+            {% endfor %}
           </div>
         </li>
       {% else %}
-        <li class="item-row empty-state">思い出はまだありません。</li>
+        <li class="item-row empty-state">まだ予定がありません</li>
       {% endfor %}
     </ul>
   </section>
-
   <div id="schedule-photo-modal" class="photo-modal is-hidden" role="dialog" aria-modal="true">
     <div class="photo-modal-card">
       <div class="photo-modal-header">
@@ -406,6 +473,61 @@
     document.addEventListener("DOMContentLoaded", () => {
       const formToggle = document.getElementById("schedule-form-toggle");
       const formPanel = document.getElementById("schedule-form-panel");
+      const scheduleBlocks = document.querySelector(".schedule-blocks");
+      const scheduleAdd = document.querySelector(".schedule-add");
+      if (scheduleBlocks && scheduleAdd) {
+        scheduleAdd.addEventListener("click", () => {
+          const template = scheduleBlocks.querySelector(".schedule-block");
+          if (!template) return;
+          const nextIndex = Number(scheduleBlocks.dataset.nextIndex || "1");
+          const clone = template.cloneNode(true);
+          clone.dataset.index = String(nextIndex);
+          const fields = clone.querySelectorAll("[data-field]");
+          fields.forEach((fieldEl) => {
+            const field = fieldEl.dataset.field || "";
+            const id = `schedule-${field}-${nextIndex}`;
+            if (fieldEl.tagName === "INPUT" || fieldEl.tagName === "TEXTAREA") {
+              if (field === "photos") {
+                fieldEl.name = `schedule_photos_${nextIndex}`;
+              } else {
+                fieldEl.name = `schedule_${field}_${nextIndex}`;
+              }
+              fieldEl.id = id;
+              if (fieldEl.type !== "file") {
+                fieldEl.value = "";
+              } else {
+                fieldEl.value = "";
+              }
+            } else {
+              fieldEl.id = id;
+            }
+            const label = fieldEl.closest("div")?.querySelector("label");
+            if (label) {
+              label.htmlFor = id;
+            }
+          });
+          const previewImg = clone.querySelector(".schedule-photo-preview");
+          if (previewImg) {
+            previewImg.classList.add("is-hidden");
+            previewImg.removeAttribute("src");
+          }
+          const previewMore = clone.querySelector(".schedule-photo-more");
+          if (previewMore) {
+            previewMore.classList.add("is-hidden");
+            delete previewMore.dataset.photos;
+          }
+          const previewCount = clone.querySelector(".schedule-photo-count");
+          if (previewCount) previewCount.textContent = "0";
+          scheduleBlocks.appendChild(clone);
+          scheduleBlocks.dataset.nextIndex = String(nextIndex + 1);
+          if (typeof window.__initScheduleBlock === "function") {
+            window.__initScheduleBlock(clone);
+          } else {
+            window.__pendingScheduleBlocks = window.__pendingScheduleBlocks || [];
+            window.__pendingScheduleBlocks.push(clone);
+          }
+        });
+      }
       if (formToggle && formPanel) {
         formToggle.addEventListener("click", () => {
           const isHidden = formPanel.classList.toggle("is-collapsed");
@@ -485,14 +607,15 @@
       const modal = document.getElementById("schedule-photo-modal");
       const modalClose = document.getElementById("schedule-photo-modal-close");
       const modalScroller = document.getElementById("schedule-photo-modal-scroller");
-      const previewMore = document.getElementById("schedule-photo-more");
+      const previewMoreButtons = document.querySelectorAll(".schedule-photo-more");
       const deleteForm = document.getElementById("schedule-photo-delete-form");
       const deleteId = document.getElementById("schedule-photo-delete-id");
       const deleteUrl = document.getElementById("schedule-photo-delete-url");
       const deleteSchedule = document.getElementById("schedule-photo-delete-schedule");
-      if (previewMore && modal && modalClose && modalScroller) {
-        previewMore.addEventListener("click", () => {
-          const list = previewMore.dataset.photos || "[]";
+      if (modal && modalClose && modalScroller) {
+        previewMoreButtons.forEach((previewMore) => {
+          previewMore.addEventListener("click", () => {
+            const list = previewMore.dataset.photos || "[]";
           let urls = [];
           try {
             urls = JSON.parse(list);
@@ -511,6 +634,7 @@
             deleteForm.classList.add("is-hidden");
           }
           modal.classList.remove("is-hidden");
+          });
         });
         modalClose.addEventListener("click", () => {
           modal.classList.add("is-hidden");
@@ -522,7 +646,7 @@
         });
       }
 
-      const listPhotos = document.querySelectorAll(".schedule-card .place-photo");
+      const listPhotos = document.querySelectorAll(".schedule-card .place-photo[data-schedule-id]");
       listPhotos.forEach((img) => {
         img.addEventListener("click", (event) => {
           event.stopPropagation();

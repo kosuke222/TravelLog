@@ -77,8 +77,18 @@
               previewImg.classList.add("is-hidden");
               previewMore.classList.add("is-hidden");
             }
+            const extractPhotoRef = (url) => {
+              const refParam = url.match(/[?&]photo_reference=([^&]+)/);
+              if (refParam && refParam[1]) return decodeURIComponent(refParam[1]);
+              const refLegacy = url.match(/[?&]1s([^&]+)/);
+              if (refLegacy && refLegacy[1]) return decodeURIComponent(refLegacy[1]);
+              return "";
+            };
+            const photoRefs = photoUrls.map((url) => extractPhotoRef(url)).filter((ref) => ref);
+
             document.getElementById("photo_url").value = photoUrl;
             document.getElementById("photo_urls").value = JSON.stringify(photoUrls);
+            document.getElementById("photo_refs").value = JSON.stringify(photoRefs);
 
             document.getElementById("rating").value = place.rating || "";
             document.getElementById("user_ratings_total").value = place.user_ratings_total || "";
@@ -266,6 +276,7 @@
       <input type="hidden" id="lng" name="lng" />
       <input type="hidden" id="photo_url" name="photo_url" />
       <input type="hidden" id="photo_urls" name="photo_urls" />
+      <input type="hidden" id="photo_refs" name="photo_refs" />
       <input type="hidden" id="rating" name="rating" />
       <input type="hidden" id="user_ratings_total" name="user_ratings_total" />
       <input type="hidden" id="website" name="website" />
@@ -320,14 +331,20 @@
               <div class="photo-shell">
                 <div class="photo-scroller">
                   {% for photo in photos[:3] %}
-                    {% set is_google = 'googleusercontent.com' in photo['url'] or 'maps.googleapis.com' in photo['url'] %}
+                    {% set raw_url = photo['url'] %}
+                    {% set is_google = raw_url.startswith('google-ref:') or 'googleusercontent.com' in raw_url or 'maps.googleapis.com' in raw_url %}
+                    {% if is_google and google_maps_api_key %}
+                      {% set ref = raw_url[11:] %}
+                      {% set display_url = 'https://maps.googleapis.com/maps/api/place/photo?maxwidth=600&photo_reference=' ~ ref ~ '&key=' ~ google_maps_api_key %}
+                    {% else %}
+                      {% set display_url = raw_url %}
+                    {% endif %}
                     <img class="place-photo"
-                         src="{{ photo['url'] }}"
+                         src="{{ display_url }}"
                          alt="{{ place['name'] }}"
                          data-photo-id="{{ photo['id'] or '' }}"
-                         data-photo-url="{{ photo['url'] }}"
+                         data-photo-url="{{ raw_url }}"
                          data-place-id="{{ place['id'] }}"
-                         data-photo-index="{{ loop.index0 }}"
                          data-google-photo="{{ '1' if is_google else '' }}" />
                   {% endfor %}
                 </div>
