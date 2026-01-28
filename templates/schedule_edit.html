@@ -76,4 +76,68 @@
       </div>
     </form>
   </section>
+
+  <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      const input = document.getElementById("photos");
+      if (!input) return;
+      const MAX_IMAGE_BYTES = 1_500_000;
+      const MAX_IMAGE_DIMENSION = 1600;
+
+      const compressImage = async (file) => {
+        if (!file.type.startsWith("image/")) {
+          return file;
+        }
+        if (file.size <= MAX_IMAGE_BYTES) {
+          return file;
+        }
+        const imageUrl = URL.createObjectURL(file);
+        try {
+          const img = new Image();
+          await new Promise((resolve, reject) => {
+            img.onload = resolve;
+            img.onerror = reject;
+            img.src = imageUrl;
+          });
+          const scale = Math.min(1, MAX_IMAGE_DIMENSION / Math.max(img.width, img.height));
+          const canvas = document.createElement("canvas");
+          canvas.width = Math.round(img.width * scale);
+          canvas.height = Math.round(img.height * scale);
+          const ctx = canvas.getContext("2d");
+          if (!ctx) return file;
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+          let quality = 0.82;
+          let blob = await new Promise((resolve) =>
+            canvas.toBlob(resolve, "image/jpeg", quality)
+          );
+          while (blob && blob.size > MAX_IMAGE_BYTES && quality > 0.6) {
+            quality -= 0.08;
+            blob = await new Promise((resolve) =>
+              canvas.toBlob(resolve, "image/jpeg", quality)
+            );
+          }
+          if (!blob) return file;
+          return new File([blob], file.name.replace(/\.[^/.]+$/, "") + ".jpg", {
+            type: "image/jpeg",
+          });
+        } finally {
+          URL.revokeObjectURL(imageUrl);
+        }
+      };
+
+      input.addEventListener("change", async () => {
+        if (!input.files || input.files.length === 0) return;
+        const dt = new DataTransfer();
+        for (const file of input.files) {
+          const next = await compressImage(file);
+          if (next.size > MAX_IMAGE_BYTES) {
+            alert("画像サイズが大きすぎます。1.5MB以下にしてください。");
+            return;
+          }
+          dt.items.add(next);
+        }
+        input.files = dt.files;
+      });
+    });
+  </script>
 {% endblock %}
