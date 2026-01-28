@@ -6,7 +6,8 @@ import random
 import uuid
 import json
 import re
-from urllib.parse import unquote
+from urllib.parse import unquote, urlencode
+from urllib.request import urlopen
 from werkzeug.utils import secure_filename
 from dotenv import load_dotenv
 
@@ -678,6 +679,26 @@ def schedule():
         .execute()
         .data
     )
+    def fetch_place_names(place_ids):
+        names = {}
+        if not api_key or not place_ids:
+            return names
+        base_url = "https://maps.googleapis.com/maps/api/place/details/json"
+        for place_id in place_ids:
+            if not place_id:
+                continue
+            try:
+                params = urlencode({"place_id": place_id, "fields": "name", "key": api_key})
+                with urlopen(f"{base_url}?{params}", timeout=5) as response:
+                    payload = json.loads(response.read().decode("utf-8"))
+                if payload.get("status") == "OK":
+                    name = payload.get("result", {}).get("name")
+                    if name:
+                        names[place_id] = name
+            except Exception:
+                continue
+        return names
+
     today = date.today()
     upcoming = []
     past = []
@@ -687,6 +708,13 @@ def schedule():
             past.append(row)
         else:
             upcoming.append(row)
+
+    place_ids = list({row.get("place_id") for row in schedules if row.get("place_id")})
+    place_names = fetch_place_names(place_ids)
+    for row in schedules:
+        place_id = row.get("place_id")
+        if place_id and place_id in place_names:
+            row["place_name"] = place_names[place_id]
 
     upcoming.sort(key=lambda r: (parse_date(r.get("date")) or date.max, r.get("id") or 0))
     past.sort(key=lambda r: (parse_date(r.get("date")) or date.min, r.get("id") or 0), reverse=True)

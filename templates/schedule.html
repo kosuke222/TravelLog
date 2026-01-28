@@ -318,7 +318,7 @@
                   {% if item["place_id"] %}
                     <div class="meta place-name"
                          data-place-id="{{ item['place_id'] }}"
-                         data-fallback="{{ item['title'] or '場所名' }}">{{ item["title"] or "場所名" }}</div>
+                         data-fallback="{{ item['place_name'] or item['title'] or '場所名' }}">{{ item["place_name"] or item["title"] or "場所名" }}</div>
                   {% elif item["address"] %}
                     <div class="meta">{{ item["address"] }}</div>
                   {% endif %}
@@ -399,7 +399,7 @@
                   {% if item["place_id"] %}
                     <div class="meta place-name"
                          data-place-id="{{ item['place_id'] }}"
-                         data-fallback="{{ item['title'] or '場所名' }}">{{ item["title"] or "場所名" }}</div>
+                         data-fallback="{{ item['place_name'] or item['title'] or '場所名' }}">{{ item["place_name"] or item["title"] or "場所名" }}</div>
                   {% elif item["address"] %}
                     <div class="meta">{{ item["address"] }}</div>
                   {% endif %}
