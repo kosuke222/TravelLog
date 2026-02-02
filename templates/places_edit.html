@@ -5,14 +5,14 @@
     <div>
       <p class="eyebrow">Edit</p>
       <h1>行きたい場所を編集</h1>
-      <p class="lead">内容と写真を更新できます。</p>
+      <p class="lead">カテゴリやメモ、写真を更新できます。</p>
     </div>
   </section>
 
   <section class="panel form-panel">
     <form method="post" action="{{ url_for('places_update', place_id=place['id']) }}" class="form-grid" enctype="multipart/form-data">
       <div>
-        <label for="name">場所</label>
+        <label for="name">スポット名</label>
         <input id="name" name="name" type="text" value="{{ place['name'] }}" />
       </div>
       <div>
@@ -32,7 +32,7 @@
         <textarea id="notes" name="notes">{{ place['notes'] or '' }}</textarea>
       </div>
       <div>
-        <label for="photos">写真（追加アップロード）</label>
+        <label for="photos">画像を追加</label>
         <input id="photos" name="photos" type="file" accept="image/*" multiple />
         {% if place["photo_url"] or photos %}
           <div class="photo-shell">

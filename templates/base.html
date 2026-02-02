@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>KouHina App</title>
+    <title>TravelLog</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
     {% block head %}{% endblock %}
   </head>
@@ -11,17 +11,28 @@
     <div class="bg-orbit"></div>
     <header class="site-header">
       <div class="logo-row">
-        <button class="button ghost image-next" type="button" id="image-switch" hidden>次の画像</button>
-        <div class="logo">KouHina App</div>
-        <button class="button ghost image-reveal" type="button" aria-controls="image-switch" aria-expanded="false">画像切替</button>
+        <div class="logo">TravelLog</div>
+        {% if active_trip %}
+          <a class="trip-badge" href="{{ url_for('trips') }}">{{ active_trip.name }}</a>
+        {% else %}
+          <a class="trip-badge" href="{{ url_for('trips') }}">旅行を選択</a>
+        {% endif %}
       </div>
       <nav class="nav">
         <a href="{{ url_for('home') }}" class="{% if request.endpoint == 'home' %}active{% endif %}" {% if request.endpoint == 'home' %}aria-current="page"{% endif %}>ホーム</a>
-        <a href="{{ url_for('schedule') }}" class="{% if request.endpoint in ['schedule', 'schedule_edit'] %}active{% endif %}" {% if request.endpoint in ['schedule', 'schedule_edit'] %}aria-current="page"{% endif %}>予定</a>
-        <a href="{{ url_for('places') }}" class="{% if request.endpoint in ['places', 'places_edit'] %}active{% endif %}" {% if request.endpoint in ['places', 'places_edit'] %}aria-current="page"{% endif %}>行きたい所</a>
-        <a href="{{ url_for('memo') }}" class="{% if request.endpoint == 'memo' %}active{% endif %}" {% if request.endpoint == 'memo' %}aria-current="page"{% endif %}>メモ</a>
-        <a href="{{ url_for('games') }}" class="{% if request.endpoint == 'games' %}active{% endif %}" {% if request.endpoint == 'games' %}aria-current="page"{% endif %}>ゲーム</a>
+        <a href="{{ url_for('places') }}" class="{% if request.endpoint in ['places', 'places_edit'] %}active{% endif %}" {% if request.endpoint in ['places', 'places_edit'] %}aria-current="page"{% endif %}>行きたい</a>
+        <a href="{{ url_for('schedule') }}" class="{% if request.endpoint in ['schedule', 'schedule_edit'] %}active{% endif %}" {% if request.endpoint in ['schedule', 'schedule_edit'] %}aria-current="page"{% endif %}>プラン</a>
+        <a href="{{ url_for('hotels') }}" class="{% if request.endpoint == 'hotels' %}active{% endif %}" {% if request.endpoint == 'hotels' %}aria-current="page"{% endif %}>ホテル</a>
+        <a href="{{ url_for('flights') }}" class="{% if request.endpoint == 'flights' %}active{% endif %}" {% if request.endpoint == 'flights' %}aria-current="page"{% endif %}>フライト</a>
+        <a href="{{ url_for('memo') }}" class="{% if request.endpoint == 'memo' %}active{% endif %}" {% if request.endpoint == 'memo' %}aria-current="page"{% endif %}>ノート</a>
       </nav>
+      <div class="header-actions">
+        {% if warika_url %}
+          <a class="button ghost" href="{{ warika_url }}" target="_blank" rel="noopener">ワリカ</a>
+        {% else %}
+          <button class="button ghost is-disabled" type="button" disabled>ワリカ</button>
+        {% endif %}
+      </div>
     </header>
 
     <main class="page">
@@ -29,7 +40,7 @@
     </main>
 
     <footer class="site-footer">
-      <span>遊びと管理をひとつに。</span>
+      <span>旅の記録をゆっくり重ねていこう。</span>
     </footer>
 
     <div class="confirm-modal is-hidden" id="confirm-modal" role="dialog" aria-modal="true">
@@ -49,7 +60,6 @@
         const confirmCancel = document.getElementById("confirm-cancel");
         const confirmOk = document.getElementById("confirm-ok");
         let pendingForm = null;
-        let pendingButton = null;
         dangerButtons.forEach((button) => {
           button.addEventListener("click", (event) => {
             if (button.dataset.confirm === "false") {
@@ -58,7 +68,6 @@
             if (!confirmModal) return;
             event.preventDefault();
             pendingForm = button.form || button.closest("form");
-            pendingButton = button;
             if (pendingForm) {
               confirmModal.classList.remove("is-hidden");
             }
@@ -75,27 +84,8 @@
             if (pendingForm) {
               pendingForm.submit();
               pendingForm = null;
-              pendingButton = null;
             }
             confirmModal.classList.add("is-hidden");
-          });
-        }
-
-        const revealButton = document.querySelector(".image-reveal");
-        const nextButton = document.querySelector(".image-next");
-        if (revealButton && nextButton) {
-          revealButton.addEventListener("click", () => {
-            if (nextButton.hasAttribute("hidden")) {
-              nextButton.removeAttribute("hidden");
-              revealButton.setAttribute("aria-expanded", "true");
-            }
-          });
-          nextButton.addEventListener("click", () => {
-            const heroImage = document.querySelector(".card-image-top[data-images]");
-            if (!heroImage || typeof window.__setHeroImage !== "function") return;
-            const currentIndex = Number(heroImage.dataset.currentIndex || "0");
-            const nextIndex = currentIndex + 1;
-            window.__setHeroImage(nextIndex);
           });
         }
       });

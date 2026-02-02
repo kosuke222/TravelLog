@@ -1,127 +1,67 @@
-﻿{% extends "base.html" %}
+{% extends "base.html" %}
 
 {% block content %}
-  <section class="grid">
-    <a class="panel card-link image-card" href="{{ url_for('schedule') }}">
-      <img
-        class="card-image-top"
-        src="{{ url_for('static', filename=(hero_images[0] if hero_images else 'img/mmm.png')) }}"
-        alt="今日の記録とスケジュール"
-        data-images='[
-          {% for image in hero_images %}
-            "{{ url_for("static", filename=image) }}"{% if not loop.last %},{% endif %}
-          {% endfor %}
-        ]'
-        data-current-index="0"
-      />
-    </a>
-
-    <a class="panel card-link schedule-card" href="{{ url_for('schedule') }}">
-      <span class="card-meta">Next Schedule</span>
-      <h2>次の予定</h2>
-      {% if next_schedule %}
-        <div class="schedule-meta schedule-date">{{ next_schedule.date or next_schedule.created_at }}</div>
-        <div class="schedule-title">{{ next_schedule.title or "予定" }}</div>
-        {% if next_schedule.detail %}
-          <p class="schedule-snippet">{{ next_schedule.detail | truncate(60, True) }}</p>
+  <section class="hero">
+    <div>
+      <p class="eyebrow">Trip Overview</p>
+      <h1 class="hero-title">次の予定とメモをひと目で。</h1>
+      <p class="lead">旅行ごとの情報をまとめて管理できます。</p>
+      <div class="cta-row">
+        <a class="button primary" href="{{ url_for('schedule') }}">プランを作る</a>
+        <a class="button ghost" href="{{ url_for('places') }}">行きたい場所</a>
+      </div>
+    </div>
+    <div class="hero-card">
+      <div class="hero-card-top">
+        <strong>次の予定</strong>
+        {% if next_date %}
+          <span class="schedule-meta">{{ next_date }}</span>
         {% endif %}
+      </div>
+      {% if next_day_schedules %}
+        <ul class="hero-list">
+          {% for item in next_day_schedules %}
+            <li>
+              {% if item.start_time_label %}{{ item.start_time_label }} {% endif %}{{ item.title or "予定" }}
+            </li>
+          {% endfor %}
+        </ul>
       {% else %}
-        <p class="schedule-snippet">予定はまだありません。</p>
+        <div class="schedule-title">まだ予定がありません</div>
       {% endif %}
-      <span class="link-arrow">詳細へ -&gt;</span>
-    </a>
+      <a class="link-arrow" href="{{ url_for('schedule') }}">詳細を見る -&gt;</a>
+    </div>
+  </section>
 
+  <section class="grid">
     <a class="panel card-link icon-card" href="{{ url_for('places') }}">
       <span class="card-icon">
         <img src="{{ url_for('static', filename='mickey.jpg') }}" alt="行きたい場所" />
       </span>
-      <h2>行きたい場所</h2>
+      <h2>行きたいところ</h2>
+    </a>
+    <a class="panel card-link icon-card" href="{{ url_for('hotels') }}">
+      <h2>ホテル</h2>
+    </a>
+    <a class="panel card-link icon-card" href="{{ url_for('flights') }}">
+      <h2>フライト</h2>
     </a>
     <a class="panel card-link icon-card" href="{{ url_for('memo') }}">
-      <span class="card-icon">
-        <img src="{{ url_for('static', filename='mini.jpg') }}" alt="メモ" />
-      </span>
-      <h2>メモ</h2>
-    </a>
-    <a class="panel card-link icon-card" href="{{ url_for('games') }}">
-      <span class="card-icon">
-        <img src="{{ url_for('static', filename='dona.jpg') }}" alt="ゲーム" />
-      </span>
-      <h2>ゲーム</h2>
+      <h2>共有ノート</h2>
     </a>
   </section>
 
-  <script>
-    document.addEventListener("DOMContentLoaded", () => {
-      const heroImage = document.querySelector(".card-image-top[data-images]");
-      if (!heroImage) return;
-      let images = [];
-      try {
-        images = JSON.parse(heroImage.dataset.images || "[]");
-      } catch (e) {
-        images = [];
-      }
-      if (!images.length) return;
-
-      const getTokyoParts = () => {
-        const formatter = new Intl.DateTimeFormat("en-CA", {
-          timeZone: "Asia/Tokyo",
-          year: "numeric",
-          month: "2-digit",
-          day: "2-digit",
-          hour: "2-digit",
-          minute: "2-digit",
-          second: "2-digit",
-          hour12: false,
-        });
-        const parts = formatter.formatToParts(new Date());
-        const map = {};
-        parts.forEach((part) => {
-          if (part.type !== "literal") {
-            map[part.type] = part.value;
-          }
-        });
-        return map;
-      };
-
-      const getDayIndex = () => {
-        const parts = getTokyoParts();
-        const year = Number(parts.year);
-        const month = Number(parts.month);
-        const day = Number(parts.day);
-        const utcDay = Date.UTC(year, month - 1, day);
-        return Math.floor(utcDay / 86400000) % images.length;
-      };
-
-      const setHeroImage = (index) => {
-        const safeIndex = ((index % images.length) + images.length) % images.length;
-        heroImage.src = images[safeIndex];
-        heroImage.dataset.currentIndex = String(safeIndex);
-      };
-
-      const applyDailyImage = () => {
-        const index = getDayIndex();
-        window.__dailyImageIndex = index;
-        setHeroImage(index);
-      };
-
-      const scheduleNextMidnight = () => {
-        const parts = getTokyoParts();
-        const year = Number(parts.year);
-        const month = Number(parts.month);
-        const day = Number(parts.day);
-        const nextMidnightUtc = Date.UTC(year, month - 1, day) + 86400000;
-        const delay = Math.max(nextMidnightUtc - Date.now(), 1000);
-        window.setTimeout(() => {
-          applyDailyImage();
-          scheduleNextMidnight();
-        }, delay);
-      };
-
-      window.__applyDailyImage = applyDailyImage;
-      window.__setHeroImage = setHeroImage;
-      applyDailyImage();
-      scheduleNextMidnight();
-    });
-  </script>
+  <section class="panel form-panel">
+    <div class="panel-header">
+      <strong>ワリカリンク</strong>
+      <span class="meta">あとから設定できます</span>
+    </div>
+    <form method="post" action="{{ url_for('warika_update') }}" class="form-grid">
+      <div>
+        <label for="warika_url">ワリカURL</label>
+        <input id="warika_url" name="warika_url" type="url" placeholder="https://..." value="{{ warika_url or '' }}" />
+      </div>
+      <button class="button primary" type="submit">保存する</button>
+    </form>
+  </section>
 {% endblock %}

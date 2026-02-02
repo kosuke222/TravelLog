@@ -1,25 +1,25 @@
-{% extends "base.html" %}
+﻿{% extends "base.html" %}
 
 {% block content %}
   <section class="page-header">
     <div>
       <p class="eyebrow">Game Memo</p>
-      <h1>やりたいゲームメモ</h1>
-      <p class="lead">アイデアをメモして、あとで整理。</p>
+      <h1>繧・ｊ縺溘＞繧ｲ繝ｼ繝繝｡繝｢</h1>
+      <p class="lead">繧｢繧､繝・い繧偵Γ繝｢縺励※縲√≠縺ｨ縺ｧ謨ｴ逅・・/p>
     </div>
   </section>
 
   <section class="panel form-panel">
     <form method="post" class="form-grid">
       <div>
-        <label for="title">タイトル</label>
-        <input id="title" name="title" type="text" placeholder="例: 2人協力パズル" required />
+        <label for="title">繧ｿ繧､繝医Ν</label>
+        <input id="title" name="title" type="text" placeholder="萓・ 2莠ｺ蜊泌鴨繝代ぜ繝ｫ" required />
       </div>
       <div>
-        <label for="body">内容</label>
-        <textarea id="body" name="body" placeholder="ルールや世界観を書いておく" required></textarea>
+        <label for="body">蜀・ｮｹ</label>
+        <textarea id="body" name="body" placeholder="繝ｫ繝ｼ繝ｫ繧・ｸ也阜隕ｳ繧呈嶌縺・※縺翫￥" required></textarea>
       </div>
-      <button class="button primary" type="submit">保存する</button>
+      <button class="button primary" type="submit">菫晏ｭ倥☆繧・/button>
     </form>
   </section>
 
@@ -32,12 +32,12 @@
         </div>
         <p class="memo-body">{{ memo["body"] }}</p>
         <form method="post" action="{{ url_for('games_memo_delete', memo_id=memo['id']) }}">
-          <button class="button danger" type="submit">削除</button>
+          <button class="button danger" type="submit">蜑企勁</button>
         </form>
       </article>
     {% else %}
       <article class="panel empty-state">
-        <p>まだメモがありません。</p>
+        <p>縺ｾ縺繝｡繝｢縺後≠繧翫∪縺帙ｓ縲・/p>
       </article>
     {% endfor %}
   </section>

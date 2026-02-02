@@ -1,19 +1,18 @@
-from flask import Flask, render_template, request, redirect, url_for
+﻿from flask import Flask, render_template, request, redirect, url_for, make_response
 from supabase import create_client, Client
 from datetime import datetime, date
 import os
-import random
 import uuid
 import json
 import re
 from urllib.parse import unquote, urlencode
-from urllib.request import urlopen
 from werkzeug.utils import secure_filename
 from dotenv import load_dotenv
 
 load_dotenv()
 
 app = Flask(__name__, template_folder="templates", static_folder="static")
+app.secret_key = os.environ.get("SECRET_KEY", "dev-secret")
 
 PLACE_CATEGORIES = ["スポット", "レストラン", "居酒屋", "カフェ", "その他"]
 LEGACY_CATEGORY_MAP = {
@@ -23,6 +22,20 @@ LEGACY_CATEGORY_MAP = {
     "cafe": "カフェ",
 }
 ALLOWED_IMAGE_EXT = {"jpg", "jpeg", "png", "webp"}
+
+TRIP_COOKIE = "travel_trip_id"
+TRIP_TABLE = "travel_trips"
+TRIP_SETTINGS_TABLE = "travel_trip_settings"
+PLACE_TABLE = "travel_places"
+PLACE_PHOTO_TABLE = "travel_place_photos"
+SCHEDULE_TABLE = "travel_schedules"
+SCHEDULE_PHOTO_TABLE = "travel_schedule_photos"
+SCHEDULE_POST_TABLE = "travel_schedule_posts"
+SCHEDULE_POST_PHOTO_TABLE = "travel_schedule_post_photos"
+MEMO_TABLE = "travel_memos"
+HOTEL_TABLE = "travel_hotels"
+HOTEL_PHOTO_TABLE = "travel_hotel_photos"
+FLIGHT_TABLE = "travel_flights"
 
 
 def get_supabase() -> Client:
@@ -46,6 +59,59 @@ def parse_date(value):
         return None
 
 
+def format_jp_date(value):
+    if not value:
+        return None
+    if isinstance(value, date):
+        return f"{value.month}月{value.day}日"
+    if isinstance(value, str):
+        parsed = parse_date(value)
+        if parsed:
+            return f"{parsed.month}月{parsed.day}日"
+    return None
+
+
+def parse_datetime(value):
+    if not value:
+        return None
+    if isinstance(value, datetime):
+        return value
+    if isinstance(value, str):
+        try:
+            return datetime.fromisoformat(value)
+        except ValueError:
+            return None
+    return None
+
+
+def format_jp_time(value):
+    parsed = parse_datetime(value)
+    if not parsed:
+        return None
+    return parsed.strftime("%H:%M")
+
+
+def format_jp_date_from_datetime(value):
+    parsed = parse_datetime(value)
+    if not parsed:
+        return None
+    return f"{parsed.month}月{parsed.day}日"
+
+
+def format_duration(start_value, end_value):
+    start_dt = parse_datetime(start_value)
+    end_dt = parse_datetime(end_value)
+    if not start_dt or not end_dt:
+        return None
+    delta = end_dt - start_dt
+    total_minutes = int(delta.total_seconds() // 60)
+    if total_minutes <= 0:
+        return None
+    hours = total_minutes // 60
+    minutes = total_minutes % 60
+    if minutes:
+        return f"{hours}時間{minutes}分"
+    return f"{hours}時間"
 
 
 def parse_float(value):
@@ -115,6 +181,17 @@ def normalize_photo_url(value):
     if ref:
         return f"google-ref:{ref}"
     return value
+
+
+def normalize_external_url(value):
+    if not value:
+        return None
+    value = value.strip()
+    if not value:
+        return None
+    if re.match(r"^https?://", value, re.IGNORECASE):
+        return value
+    return f"https://{value}"
 
 
 def upload_place_photo(sb: Client, file_storage):
@@ -194,7 +271,9 @@ def collect_schedule_entries(form, files):
     entries = []
     for index in sorted(indices):
         title = (form.get(f"schedule_title_{index}") or "").strip()
-        schedule_date = (form.get(f"schedule_date_{index}") or "").strip()
+        schedule_date = (form.get(f"schedule_date_{index}") or "").strip() or None
+        start_time = (form.get(f"schedule_start_time_{index}") or "").strip() or None
+        end_time = (form.get(f"schedule_end_time_{index}") or "").strip() or None
         detail = (form.get(f"schedule_detail_{index}") or "").strip()
         place_id = form.get(f"schedule_place_id_{index}") or None
         address = form.get(f"schedule_address_{index}") or None
@@ -216,6 +295,8 @@ def collect_schedule_entries(form, files):
             {
                 "title": title,
                 "date": schedule_date,
+                "start_time": start_time,
+                "end_time": end_time,
                 "detail": detail,
                 "place_id": place_id,
                 "address": address,
@@ -236,8 +317,71 @@ def collect_schedule_entries(form, files):
     return entries
 
 
+def get_trip_cookie_id():
+    value = request.cookies.get(TRIP_COOKIE)
+    if value and value.isdigit():
+        return int(value)
+    return None
+
+
+def fetch_trip(sb: Client, trip_id: int):
+    data = (
+        sb.table(TRIP_TABLE)
+        .select("id, name, start_date, end_date, note, created_at")
+        .eq("id", trip_id)
+        .execute()
+        .data
+    )
+    return data[0] if data else None
+
+
+def get_active_trip(sb: Client):
+    trip_id = get_trip_cookie_id()
+    if not trip_id:
+        return None
+    return fetch_trip(sb, trip_id)
+
+
+def get_warika_url(sb: Client, trip_id: int):
+    data = (
+        sb.table(TRIP_SETTINGS_TABLE)
+        .select("warika_url")
+        .eq("trip_id", trip_id)
+        .execute()
+        .data
+    )
+    if data:
+        return data[0].get("warika_url")
+    return None
+
+
+def upsert_warika_url(sb: Client, trip_id: int, url):
+    payload = {
+        "trip_id": trip_id,
+        "warika_url": url,
+        "updated_at": now_str(),
+    }
+    sb.table(TRIP_SETTINGS_TABLE).upsert(payload, on_conflict="trip_id").execute()
+
+
+@app.context_processor
+def inject_global_context():
+    try:
+        sb = get_supabase()
+    except RuntimeError:
+        return {}
+    trip = get_active_trip(sb)
+    warika_url = get_warika_url(sb, trip["id"]) if trip else None
+    return {"active_trip": trip, "warika_url": warika_url}
+
+
 @app.route("/")
 def home():
+    sb = get_supabase()
+    trip = get_active_trip(sb)
+    if not trip:
+        return redirect(url_for("trips"))
+
     image_dir = os.path.join(app.static_folder, "img")
     image_files = []
     if os.path.isdir(image_dir):
@@ -245,99 +389,112 @@ def home():
             if name.lower().endswith((".png", ".jpg", ".jpeg", ".webp")):
                 image_files.append(f"img/{name}")
     image_files.sort()
-    sb = get_supabase()
+
     schedules = (
-        sb.table("schedules")
-        .select("id, title, date, detail, created_at")
+        sb.table(SCHEDULE_TABLE)
+        .select("id, title, date, start_time, detail, created_at")
+        .eq("trip_id", trip["id"])
         .order("date", desc=False)
+        .order("start_time", desc=False)
         .order("id", desc=True)
         .execute()
         .data
     )
     today = date.today()
-    next_schedule = None
+    upcoming_by_date = {}
     for row in schedules:
         row_date = parse_date(row.get("date"))
-        if row_date and row_date >= today:
-            next_schedule = row
-            break
-    # If there is no upcoming schedule, keep it empty.
+        if not row_date or row_date < today:
+            continue
+        if row.get("start_time"):
+            row["start_time_label"] = str(row["start_time"])[:5]
+        upcoming_by_date.setdefault(row_date, []).append(row)
+    next_date = min(upcoming_by_date.keys()) if upcoming_by_date else None
+    next_day_schedules = upcoming_by_date.get(next_date, []) if next_date else []
     return render_template(
         "home.html",
-        next_schedule=next_schedule,
+        next_date=next_date,
+        next_day_schedules=next_day_schedules,
         hero_images=image_files,
     )
 
 
-@app.route("/games")
-def games():
-    return render_template("games_index.html")
-
-
-@app.route("/games/memo", methods=["GET", "POST"])
-def games_memo():
+@app.route("/trips", methods=["GET", "POST"])
+def trips():
     sb = get_supabase()
     if request.method == "POST":
-        title = request.form.get("title", "").strip()
-        body = request.form.get("body", "").strip()
-        if title and body:
-            sb.table("game_memos").insert(
-                {"title": title, "body": body, "created_at": now_str()}
-            ).execute()
-        return redirect(url_for("games_memo"))
+        name = (request.form.get("name") or "").strip() or "新しい旅行"
+        start_date = request.form.get("start_date") or None
+        end_date = request.form.get("end_date") or None
+        note = (request.form.get("note") or "").strip() or None
+        created = (
+            sb.table(TRIP_TABLE)
+            .insert(
+                {
+                    "name": name,
+                    "start_date": start_date,
+                    "end_date": end_date,
+                    "note": note,
+                    "created_at": now_str(),
+                }
+            )
+            .execute()
+            .data
+        )
+        trip_id = created[0]["id"] if created else None
+        resp = make_response(redirect(url_for("home")))
+        if trip_id:
+            resp.set_cookie(TRIP_COOKIE, str(trip_id), max_age=60 * 60 * 24 * 365, samesite="Lax")
+        return resp
 
-    memos = (
-        sb.table("game_memos")
-        .select("id, title, body, created_at")
+    trips_data = (
+        sb.table(TRIP_TABLE)
+        .select("id, name, start_date, end_date, note, created_at")
         .order("id", desc=True)
         .execute()
         .data
     )
-    return render_template("games_memo.html", memos=memos)
-
-
-@app.post("/games/memo/<int:memo_id>/delete")
-def games_memo_delete(memo_id):
-    sb = get_supabase()
-    sb.table("game_memos").delete().eq("id", memo_id).execute()
-    return redirect(url_for("games_memo"))
-
-
-@app.route("/games/lottery", methods=["GET", "POST"])
-def games_lottery():
-    sb = get_supabase()
-    if request.method == "POST":
-        text = request.form.get("text", "").strip()
-        if text:
-            sb.table("lottery_items").insert(
-                {"text": text, "created_at": now_str()}
-            ).execute()
-        return redirect(url_for("games_lottery"))
-
-    draw = request.args.get("draw")
-    result = None
-    items = (
-        sb.table("lottery_items")
-        .select("id, text, created_at")
-        .order("id", desc=True)
-        .execute()
-        .data
+    return render_template(
+        "trips.html",
+        trips=trips_data,
+        selected_trip_id=get_trip_cookie_id(),
     )
-    if draw and items:
-        result = random.choice(items)["text"]
-    return render_template("games_lottery.html", items=items, result=result)
 
 
-@app.post("/games/lottery/<int:item_id>/delete")
-def games_lottery_delete(item_id):
+@app.post("/trips/select")
+def trips_select():
+    trip_id = request.form.get("trip_id") or ""
+    if not trip_id.isdigit():
+        return redirect(url_for("trips"))
+    resp = make_response(redirect(url_for("home")))
+    resp.set_cookie(TRIP_COOKIE, trip_id, max_age=60 * 60 * 24 * 365, samesite="Lax")
+    return resp
+
+
+@app.post("/trips/clear")
+def trips_clear():
+    resp = make_response(redirect(url_for("trips")))
+    resp.delete_cookie(TRIP_COOKIE)
+    return resp
+
+
+@app.post("/settings/warika")
+def warika_update():
     sb = get_supabase()
-    sb.table("lottery_items").delete().eq("id", item_id).execute()
-    return redirect(url_for("games_lottery"))
-
+    trip = get_active_trip(sb)
+    if not trip:
+        return redirect(url_for("trips"))
+    url = normalize_external_url(request.form.get("warika_url") or "")
+    upsert_warika_url(sb, trip["id"], url)
+    return redirect(url_for("home"))
 
 @app.route("/places", methods=["GET", "POST"])
 def places():
     sb = get_supabase()
+    trip = get_active_trip(sb)
+    if not trip:
+        return redirect(url_for("trips"))
+
     category = request.args.get("category", "all")
     if request.method == "POST":
         name = request.form.get("name", "").strip()
@@ -356,9 +513,10 @@ def places():
         opening_hours = request.form.get("opening_hours") or None
         if name or notes or address:
             place = (
-                sb.table("places")
+                sb.table(PLACE_TABLE)
                 .insert(
                     {
+                        "trip_id": trip["id"],
                         "name": name or "行きたい場所",
                         "category": cat,
                         "notes": notes,
@@ -390,7 +548,7 @@ def places():
             photo_urls = upload_place_photos(sb, request.files.getlist("photos"))
             all_photo_urls = google_photo_entries + photo_urls
             if place_id and all_photo_urls:
-                sb.table("place_photos").insert(
+                sb.table(PLACE_PHOTO_TABLE).insert(
                     [
                         {
                             "place_id": place_id,
@@ -403,12 +561,13 @@ def places():
         return redirect(url_for("places", category=category))
 
     query = (
-        sb.table("places")
+        sb.table(PLACE_TABLE)
         .select(
             "id, name, category, notes, place_id, address, lat, lng, "
             "photo_url, rating, user_ratings_total, website, phone, google_url, "
             "opening_hours, created_at"
         )
+        .eq("trip_id", trip["id"])
         .order("id", desc=True)
     )
     rows = query.execute().data
@@ -420,7 +579,7 @@ def places():
     photos_by_place = {}
     if place_ids:
         photos = (
-            sb.table("place_photos")
+            sb.table(PLACE_PHOTO_TABLE)
             .select("id, place_id, photo_url")
             .in_("place_id", place_ids)
             .order("id", desc=False)
@@ -455,13 +614,18 @@ def places():
 @app.route("/places/<int:place_id>/edit")
 def places_edit(place_id):
     sb = get_supabase()
+    trip = get_active_trip(sb)
+    if not trip:
+        return redirect(url_for("trips"))
+
     data = (
-        sb.table("places")
+        sb.table(PLACE_TABLE)
         .select(
             "id, name, category, notes, place_id, address, lat, lng, photo_url, "
             "rating, user_ratings_total, website, phone, google_url, opening_hours"
         )
         .eq("id", place_id)
+        .eq("trip_id", trip["id"])
         .execute()
         .data
     )
@@ -469,7 +633,7 @@ def places_edit(place_id):
         return redirect(url_for("places"))
     data[0]["category"] = normalize_category(data[0].get("category"))
     photos = (
-        sb.table("place_photos")
+        sb.table(PLACE_PHOTO_TABLE)
         .select("id, place_id, photo_url")
         .eq("place_id", place_id)
         .order("id", desc=False)
@@ -488,6 +652,10 @@ def places_edit(place_id):
 @app.post("/places/<int:place_id>/update")
 def places_update(place_id):
     sb = get_supabase()
+    trip = get_active_trip(sb)
+    if not trip:
+        return redirect(url_for("trips"))
+
     name = request.form.get("name", "").strip()
     category = normalize_category(request.form.get("category", "").strip())
     notes = request.form.get("notes", "").strip()
@@ -519,7 +687,7 @@ def places_update(place_id):
             "google_url": google_url,
             "opening_hours": opening_hours,
         }
-        sb.table("places").update(payload).eq("id", place_id).execute()
+        sb.table(PLACE_TABLE).update(payload).eq("id", place_id).eq("trip_id", trip["id"]).execute()
         google_photo_refs = parse_photo_refs(request.form.get("photo_refs"))
         if not google_photo_refs:
             google_photo_urls = parse_photo_urls(request.form.get("photo_urls"))
@@ -530,7 +698,7 @@ def places_update(place_id):
         photo_urls = upload_place_photos(sb, request.files.getlist("photos"))
         all_photo_urls = google_photo_entries + photo_urls
         if all_photo_urls:
-            sb.table("place_photos").insert(
+            sb.table(PLACE_PHOTO_TABLE).insert(
                 [
                     {
                         "place_id": place_id,
@@ -546,13 +714,19 @@ def places_update(place_id):
 @app.post("/places/<int:place_id>/delete")
 def places_delete(place_id):
     sb = get_supabase()
-    sb.table("places").delete().eq("id", place_id).execute()
+    trip = get_active_trip(sb)
+    if not trip:
+        return redirect(url_for("trips"))
+    sb.table(PLACE_TABLE).delete().eq("id", place_id).eq("trip_id", trip["id"]).execute()
     return redirect(url_for("places"))
 
 
 @app.post("/places/photo/delete")
 def places_photo_delete():
     sb = get_supabase()
+    trip = get_active_trip(sb)
+    if not trip:
+        return redirect(url_for("trips"))
     photo_id = request.form.get("photo_id") or None
     place_id = request.form.get("place_id") or None
     photo_url = request.form.get("photo_url") or None
@@ -562,28 +736,33 @@ def places_photo_delete():
     if place_id and str(place_id).isdigit():
         place_id = int(place_id)
     if photo_id:
-        sb.table("place_photos").delete().eq("id", photo_id).execute()
+        sb.table(PLACE_PHOTO_TABLE).delete().eq("id", photo_id).execute()
     if place_id and photo_url:
-        sb.table("place_photos").delete().eq("place_id", place_id).eq("photo_url", photo_url).execute()
-        sb.table("places").update({"photo_url": None}).eq("id", place_id).eq(
+        sb.table(PLACE_PHOTO_TABLE).delete().eq("place_id", place_id).eq("photo_url", photo_url).execute()
+        sb.table(PLACE_TABLE).update({"photo_url": None}).eq("id", place_id).eq(
             "photo_url", photo_url
         ).execute()
     return redirect(url_for("places", category=category))
 
-
 @app.route("/schedule", methods=["GET", "POST"])
 def schedule():
     sb = get_supabase()
+    trip = get_active_trip(sb)
+    if not trip:
+        return redirect(url_for("trips"))
     api_key = os.getenv("GOOGLE_MAPS_API_KEY")
     if request.method == "POST":
         schedule_entries = collect_schedule_entries(request.form, request.files)
         for entry in schedule_entries:
             schedule_row = (
-                sb.table("schedules")
+                sb.table(SCHEDULE_TABLE)
                 .insert(
                     {
-                        "title": entry["title"] or "??",
+                        "trip_id": trip["id"],
+                        "title": entry["title"] or "予定",
                         "date": entry["date"],
+                        "start_time": entry["start_time"],
+                        "end_time": entry["end_time"],
                         "detail": entry["detail"],
                         "place_id": entry["place_id"],
                         "address": entry["address"],
@@ -614,7 +793,7 @@ def schedule():
             photo_urls = upload_place_photos(sb, entry["photo_files"])
             all_photo_urls = (google_photo_entries + photo_urls)[:3]
             if all_photo_urls:
-                sb.table("schedule_photos").insert(
+                sb.table(SCHEDULE_PHOTO_TABLE).insert(
                     [
                         {
                             "schedule_id": schedule_id,
@@ -667,37 +846,18 @@ def schedule():
                 group["form_id"] = group["date_key"].replace("-", "") or "undated"
         return groups
 
-
     schedules = (
-        sb.table("schedules")
+        sb.table(SCHEDULE_TABLE)
         .select(
-            "id, title, date, detail, place_id, address, lat, lng, photo_url, "
+            "id, title, date, start_time, end_time, detail, place_id, address, lat, lng, photo_url, "
             "rating, user_ratings_total, website, phone, google_url, opening_hours, created_at"
         )
+        .eq("trip_id", trip["id"])
         .order("date", desc=False)
         .order("id", desc=True)
         .execute()
         .data
     )
-    def fetch_place_names(place_ids):
-        names = {}
-        if not api_key or not place_ids:
-            return names
-        base_url = "https://maps.googleapis.com/maps/api/place/details/json"
-        for place_id in place_ids:
-            if not place_id:
-                continue
-            try:
-                params = urlencode({"place_id": place_id, "fields": "name", "key": api_key})
-                with urlopen(f"{base_url}?{params}", timeout=5) as response:
-                    payload = json.loads(response.read().decode("utf-8"))
-                if payload.get("status") == "OK":
-                    name = payload.get("result", {}).get("name")
-                    if name:
-                        names[place_id] = name
-            except Exception:
-                continue
-        return names
 
     today = date.today()
     upcoming = []
@@ -709,13 +869,6 @@ def schedule():
         else:
             upcoming.append(row)
 
-    place_ids = list({row.get("place_id") for row in schedules if row.get("place_id")})
-    place_names = fetch_place_names(place_ids)
-    for row in schedules:
-        place_id = row.get("place_id")
-        if place_id and place_id in place_names:
-            row["place_name"] = place_names[place_id]
-
     upcoming.sort(key=lambda r: (parse_date(r.get("date")) or date.max, r.get("id") or 0))
     past.sort(key=lambda r: (parse_date(r.get("date")) or date.min, r.get("id") or 0), reverse=True)
 
@@ -725,13 +878,14 @@ def schedule():
     post_photos_by_post = {}
     if schedule_ids:
         photos = (
-            sb.table("schedule_photos")
+            sb.table(SCHEDULE_PHOTO_TABLE)
             .select("id, schedule_id, photo_url")
             .in_("schedule_id", schedule_ids)
             .order("id", desc=False)
             .execute()
             .data
         )
+
         def build_schedule_photo_entry(photo_row):
             raw_url = photo_row.get("photo_url") or ""
             ref = ""
@@ -752,12 +906,13 @@ def schedule():
                 "display_url": display_url,
                 "is_google": is_google,
             }
+
         for photo in photos:
             photos_by_schedule.setdefault(photo["schedule_id"], []).append(
                 build_schedule_photo_entry(photo)
             )
         posts = (
-            sb.table("schedule_posts")
+            sb.table(SCHEDULE_POST_TABLE)
             .select("id, schedule_id, time, title, body, created_at")
             .in_("schedule_id", schedule_ids)
             .order("id", desc=False)
@@ -769,7 +924,7 @@ def schedule():
         post_ids = [post["id"] for post in posts]
         if post_ids:
             post_photos = (
-                sb.table("schedule_post_photos")
+                sb.table(SCHEDULE_POST_PHOTO_TABLE)
                 .select("id, post_id, photo_url")
                 .in_("post_id", post_ids)
                 .order("id", desc=False)
@@ -792,7 +947,7 @@ def schedule():
             if len(ordered) > 3:
                 excess_ids = [photo["id"] for photo in ordered[3:] if photo.get("id")]
                 if excess_ids:
-                    sb.table("schedule_photos").delete().in_("id", excess_ids).execute()
+                    sb.table(SCHEDULE_PHOTO_TABLE).delete().in_("id", excess_ids).execute()
                 ordered = ordered[:3]
             photos_by_schedule[row["id"]] = ordered
         schedule_posts = posts_by_schedule.get(row["id"], [])
@@ -824,20 +979,24 @@ def schedule():
 @app.route("/schedule/<int:schedule_id>/edit")
 def schedule_edit(schedule_id):
     sb = get_supabase()
+    trip = get_active_trip(sb)
+    if not trip:
+        return redirect(url_for("trips"))
     data = (
-        sb.table("schedules")
+        sb.table(SCHEDULE_TABLE)
         .select(
-            "id, title, date, detail, place_id, address, lat, lng, photo_url, "
+            "id, title, date, start_time, end_time, detail, place_id, address, lat, lng, photo_url, "
             "rating, user_ratings_total, website, phone, google_url, opening_hours"
         )
         .eq("id", schedule_id)
+        .eq("trip_id", trip["id"])
         .execute()
         .data
     )
     if not data:
         return redirect(url_for("schedule"))
     photos = (
-        sb.table("schedule_photos")
+        sb.table(SCHEDULE_PHOTO_TABLE)
         .select("id, schedule_id, photo_url")
         .eq("schedule_id", schedule_id)
         .order("id", desc=False)
@@ -855,8 +1014,13 @@ def schedule_edit(schedule_id):
 @app.post("/schedule/<int:schedule_id>/update")
 def schedule_update(schedule_id):
     sb = get_supabase()
+    trip = get_active_trip(sb)
+    if not trip:
+        return redirect(url_for("trips"))
     title = request.form.get("title", "").strip()
     schedule_date = request.form.get("date", "").strip()
+    start_time = (request.form.get("start_time") or "").strip() or None
+    end_time = (request.form.get("end_time") or "").strip() or None
     detail = request.form.get("detail", "").strip()
     place_id = request.form.get("place_id") or None
     address = request.form.get("address") or None
@@ -870,10 +1034,12 @@ def schedule_update(schedule_id):
     google_url = request.form.get("google_url") or None
     opening_hours = request.form.get("opening_hours") or None
     if title or schedule_date or detail or address:
-        sb.table("schedules").update(
+        sb.table(SCHEDULE_TABLE).update(
             {
                 "title": title or "予定",
                 "date": schedule_date,
+                "start_time": start_time,
+                "end_time": end_time,
                 "detail": detail,
                 "place_id": place_id,
                 "address": address,
@@ -887,7 +1053,7 @@ def schedule_update(schedule_id):
                 "google_url": google_url,
                 "opening_hours": opening_hours,
             }
-        ).eq("id", schedule_id).execute()
+        ).eq("id", schedule_id).eq("trip_id", trip["id"]).execute()
         google_photo_refs = parse_photo_refs(request.form.get("photo_refs"))
         if not google_photo_refs:
             google_photo_urls = parse_photo_urls(request.form.get("photo_urls"))
@@ -898,7 +1064,7 @@ def schedule_update(schedule_id):
         photo_urls = upload_place_photos(sb, request.files.getlist("photos"))
         all_photo_urls = google_photo_entries + photo_urls
         if all_photo_urls:
-            sb.table("schedule_photos").insert(
+            sb.table(SCHEDULE_PHOTO_TABLE).insert(
                 [
                     {
                         "schedule_id": schedule_id,
@@ -910,16 +1076,18 @@ def schedule_update(schedule_id):
             ).execute()
     return redirect(url_for("schedule"))
 
-
 @app.post("/schedule/<int:schedule_id>/posts")
 def schedule_post_create(schedule_id):
     sb = get_supabase()
+    trip = get_active_trip(sb)
+    if not trip:
+        return redirect(url_for("trips"))
     post_entries = collect_post_entries(request.form, request.files, prefix="post")
     if not post_entries:
         return redirect(url_for("schedule"))
     for entry in post_entries:
         post = (
-            sb.table("schedule_posts")
+            sb.table(SCHEDULE_POST_TABLE)
             .insert(
                 {
                     "schedule_id": schedule_id,
@@ -935,7 +1103,7 @@ def schedule_post_create(schedule_id):
         post_id = post[0]["id"] if post else None
         photo_urls = upload_place_photos(sb, entry["files"])
         if post_id and photo_urls:
-            sb.table("schedule_post_photos").insert(
+            sb.table(SCHEDULE_POST_PHOTO_TABLE).insert(
                 [
                     {
                         "post_id": post_id,
@@ -951,14 +1119,20 @@ def schedule_post_create(schedule_id):
 @app.post("/schedule/post/<int:post_id>/delete")
 def schedule_post_delete(post_id):
     sb = get_supabase()
-    sb.table("schedule_post_photos").delete().eq("post_id", post_id).execute()
-    sb.table("schedule_posts").delete().eq("id", post_id).execute()
+    trip = get_active_trip(sb)
+    if not trip:
+        return redirect(url_for("trips"))
+    sb.table(SCHEDULE_POST_PHOTO_TABLE).delete().eq("post_id", post_id).execute()
+    sb.table(SCHEDULE_POST_TABLE).delete().eq("id", post_id).execute()
     return redirect(url_for("schedule"))
 
 
 @app.post("/schedule/post/photo/delete")
 def schedule_post_photo_delete():
     sb = get_supabase()
+    trip = get_active_trip(sb)
+    if not trip:
+        return redirect(url_for("trips"))
     photo_id = request.form.get("photo_id") or None
     post_id = request.form.get("post_id") or None
     photo_url = request.form.get("photo_url") or None
@@ -967,9 +1141,9 @@ def schedule_post_photo_delete():
     if post_id and str(post_id).isdigit():
         post_id = int(post_id)
     if photo_id:
-        sb.table("schedule_post_photos").delete().eq("id", photo_id).execute()
+        sb.table(SCHEDULE_POST_PHOTO_TABLE).delete().eq("id", photo_id).execute()
     if post_id and photo_url:
-        sb.table("schedule_post_photos").delete().eq("post_id", post_id).eq(
+        sb.table(SCHEDULE_POST_PHOTO_TABLE).delete().eq("post_id", post_id).eq(
             "photo_url", photo_url
         ).execute()
     return redirect(url_for("schedule"))
@@ -978,13 +1152,19 @@ def schedule_post_photo_delete():
 @app.post("/schedule/<int:schedule_id>/delete")
 def schedule_delete(schedule_id):
     sb = get_supabase()
-    sb.table("schedules").delete().eq("id", schedule_id).execute()
+    trip = get_active_trip(sb)
+    if not trip:
+        return redirect(url_for("trips"))
+    sb.table(SCHEDULE_TABLE).delete().eq("id", schedule_id).eq("trip_id", trip["id"]).execute()
     return redirect(url_for("schedule"))
 
 
 @app.post("/schedule/photo/delete")
 def schedule_photo_delete():
     sb = get_supabase()
+    trip = get_active_trip(sb)
+    if not trip:
+        return redirect(url_for("trips"))
     photo_id = request.form.get("photo_id") or None
     schedule_id = request.form.get("schedule_id") or None
     photo_url = request.form.get("photo_url") or None
@@ -993,12 +1173,12 @@ def schedule_photo_delete():
     if schedule_id and str(schedule_id).isdigit():
         schedule_id = int(schedule_id)
     if photo_id:
-        sb.table("schedule_photos").delete().eq("id", photo_id).execute()
+        sb.table(SCHEDULE_PHOTO_TABLE).delete().eq("id", photo_id).execute()
     if schedule_id and photo_url:
-        sb.table("schedule_photos").delete().eq("schedule_id", schedule_id).eq(
+        sb.table(SCHEDULE_PHOTO_TABLE).delete().eq("schedule_id", schedule_id).eq(
             "photo_url", photo_url
         ).execute()
-        sb.table("schedules").update({"photo_url": None}).eq("id", schedule_id).eq(
+        sb.table(SCHEDULE_TABLE).update({"photo_url": None}).eq("id", schedule_id).eq(
             "photo_url", photo_url
         ).execute()
     return redirect(url_for("schedule"))
@@ -1007,44 +1187,362 @@ def schedule_photo_delete():
 @app.route("/memo", methods=["GET", "POST"])
 def memo():
     sb = get_supabase()
-    tab = request.args.get("tab", "all")
+    trip = get_active_trip(sb)
+    if not trip:
+        return redirect(url_for("trips"))
     if request.method == "POST":
-        tab_name = request.form.get("tab_name", "").strip() or "未分類"
         body = request.form.get("body", "").strip()
         if body:
-            sb.table("memos").insert(
+            sb.table(MEMO_TABLE).insert(
                 {
-                    "tab_name": tab_name,
+                    "trip_id": trip["id"],
                     "body": body,
                     "created_at": now_str(),
                 }
             ).execute()
-        return redirect(url_for("memo", tab=tab_name))
+        return redirect(url_for("memo"))
 
-    tabs_data = sb.table("memos").select("tab_name").execute().data
-    tabs = sorted({row.get("tab_name") or "未分類" for row in tabs_data})
-    query = sb.table("memos").select(
-        "id, tab_name, body, created_at"
-    ).order("id", desc=True)
-    if tab != "all":
-        query = query.eq("tab_name", tab)
-    memos = query.execute().data
-    for memo in memos:
-        memo["tab_name"] = memo.get("tab_name") or "未分類"
+    memos = (
+        sb.table(MEMO_TABLE)
+        .select("id, body, created_at")
+        .eq("trip_id", trip["id"])
+        .order("id", desc=True)
+        .execute()
+        .data
+    )
     return render_template(
         "memo.html",
         memos=memos,
-        tabs=tabs,
-        active_tab=tab,
     )
 
 
 @app.post("/memo/<int:memo_id>/delete")
 def memo_delete(memo_id):
     sb = get_supabase()
-    sb.table("memos").delete().eq("id", memo_id).execute()
+    trip = get_active_trip(sb)
+    if not trip:
+        return redirect(url_for("trips"))
+    sb.table(MEMO_TABLE).delete().eq("id", memo_id).eq("trip_id", trip["id"]).execute()
     return redirect(url_for("memo"))
+
+@app.route("/hotels", methods=["GET", "POST"])
+def hotels():
+    sb = get_supabase()
+    trip = get_active_trip(sb)
+    if not trip:
+        return redirect(url_for("trips"))
+    if request.method == "POST":
+        name = request.form.get("name", "").strip()
+        address = request.form.get("address", "").strip()
+        map_url = normalize_external_url(request.form.get("map_url") or "")
+        website_url = normalize_external_url(request.form.get("website_url") or "")
+        checkin_date = request.form.get("checkin_date") or None
+        checkout_date = request.form.get("checkout_date") or None
+        notes = request.form.get("notes", "").strip()
+        if name or address or notes:
+            created = (
+                sb.table(HOTEL_TABLE)
+                .insert(
+                    {
+                        "trip_id": trip["id"],
+                        "name": name or "ホテル",
+                        "address": address,
+                        "map_url": map_url,
+                        "website_url": website_url,
+                        "checkin_date": checkin_date,
+                        "checkout_date": checkout_date,
+                        "notes": notes,
+                        "created_at": now_str(),
+                    }
+                )
+                .execute()
+                .data
+            )
+            hotel_id = created[0]["id"] if created else None
+            if hotel_id:
+                photo_urls = upload_place_photos(sb, request.files.getlist("photos"))
+                if photo_urls:
+                    sb.table(HOTEL_PHOTO_TABLE).insert(
+                        [
+                            {
+                                "hotel_id": hotel_id,
+                                "photo_url": url,
+                                "created_at": now_str(),
+                            }
+                            for url in photo_urls
+                        ]
+                    ).execute()
+        return redirect(url_for("hotels"))
+
+    hotels_data = (
+        sb.table(HOTEL_TABLE)
+        .select("id, name, address, map_url, website_url, checkin_date, checkout_date, notes, created_at")
+        .eq("trip_id", trip["id"])
+        .order("id", desc=True)
+        .execute()
+        .data
+    )
+    for row in hotels_data:
+        row["checkin_label"] = format_jp_date(row.get("checkin_date"))
+        row["checkout_label"] = format_jp_date(row.get("checkout_date"))
+    hotel_ids = [row["id"] for row in hotels_data]
+    photos_by_hotel = {}
+    if hotel_ids:
+        photos = (
+            sb.table(HOTEL_PHOTO_TABLE)
+            .select("id, hotel_id, photo_url")
+            .in_("hotel_id", hotel_ids)
+            .order("id", desc=False)
+            .execute()
+            .data
+        )
+        for photo in photos:
+            photos_by_hotel.setdefault(photo["hotel_id"], []).append(photo)
+    return render_template(
+        "hotels.html",
+        hotels=hotels_data,
+        photos_by_hotel=photos_by_hotel,
+        google_maps_api_key=os.getenv("GOOGLE_MAPS_API_KEY"),
+    )
+
+
+@app.route("/hotels/<int:hotel_id>/edit")
+def hotels_edit(hotel_id):
+    sb = get_supabase()
+    trip = get_active_trip(sb)
+    if not trip:
+        return redirect(url_for("trips"))
+    data = (
+        sb.table(HOTEL_TABLE)
+        .select("id, name, address, map_url, website_url, checkin_date, checkout_date, notes, created_at")
+        .eq("id", hotel_id)
+        .eq("trip_id", trip["id"])
+        .execute()
+        .data
+    )
+    if not data:
+        return redirect(url_for("hotels"))
+    photos = (
+        sb.table(HOTEL_PHOTO_TABLE)
+        .select("id, hotel_id, photo_url")
+        .eq("hotel_id", hotel_id)
+        .order("id", desc=False)
+        .execute()
+        .data
+    )
+    return render_template(
+        "hotels_edit.html",
+        hotel=data[0],
+        photos=photos,
+        google_maps_api_key=os.getenv("GOOGLE_MAPS_API_KEY"),
+    )
+
+
+@app.post("/hotels/<int:hotel_id>/update")
+def hotels_update(hotel_id):
+    sb = get_supabase()
+    trip = get_active_trip(sb)
+    if not trip:
+        return redirect(url_for("trips"))
+    name = request.form.get("name", "").strip()
+    address = request.form.get("address", "").strip()
+    map_url = normalize_external_url(request.form.get("map_url") or "")
+    website_url = normalize_external_url(request.form.get("website_url") or "")
+    checkin_date = request.form.get("checkin_date") or None
+    checkout_date = request.form.get("checkout_date") or None
+    notes = request.form.get("notes", "").strip()
+    if name or address or notes:
+        payload = {
+            "name": name or "ホテル",
+            "address": address,
+            "map_url": map_url,
+            "website_url": website_url,
+            "checkin_date": checkin_date,
+            "checkout_date": checkout_date,
+            "notes": notes,
+        }
+        sb.table(HOTEL_TABLE).update(payload).eq("id", hotel_id).eq("trip_id", trip["id"]).execute()
+        photo_urls = upload_place_photos(sb, request.files.getlist("photos"))
+        if photo_urls:
+            sb.table(HOTEL_PHOTO_TABLE).insert(
+                [
+                    {
+                        "hotel_id": hotel_id,
+                        "photo_url": url,
+                        "created_at": now_str(),
+                    }
+                    for url in photo_urls
+                ]
+            ).execute()
+    return redirect(url_for("hotels"))
+
+
+@app.post("/hotels/<int:hotel_id>/delete")
+def hotels_delete(hotel_id):
+    sb = get_supabase()
+    trip = get_active_trip(sb)
+    if not trip:
+        return redirect(url_for("trips"))
+    sb.table(HOTEL_TABLE).delete().eq("id", hotel_id).eq("trip_id", trip["id"]).execute()
+    return redirect(url_for("hotels"))
+
+
+@app.post("/hotels/photo/delete")
+def hotels_photo_delete():
+    sb = get_supabase()
+    trip = get_active_trip(sb)
+    if not trip:
+        return redirect(url_for("trips"))
+    photo_id = request.form.get("photo_id") or None
+    hotel_id = request.form.get("hotel_id") or None
+    if photo_id and str(photo_id).isdigit():
+        photo_id = int(photo_id)
+    if hotel_id and str(hotel_id).isdigit():
+        hotel_id = int(hotel_id)
+    if photo_id:
+        sb.table(HOTEL_PHOTO_TABLE).delete().eq("id", photo_id).execute()
+    if hotel_id:
+        sb.table(HOTEL_PHOTO_TABLE).delete().eq("hotel_id", hotel_id).execute()
+    return redirect(url_for("hotels"))
+
+
+@app.route("/flights", methods=["GET", "POST"])
+def flights():
+    sb = get_supabase()
+    trip = get_active_trip(sb)
+    if not trip:
+        return redirect(url_for("trips"))
+    if request.method == "POST":
+        payload = {
+            "trip_id": trip["id"],
+            "airline": (request.form.get("airline") or "").strip(),
+            "flight_no": (request.form.get("flight_no") or "").strip(),
+            "depart_airport": (request.form.get("depart_airport") or "").strip(),
+            "depart_at": request.form.get("depart_at") or None,
+            "arrive_airport": (request.form.get("arrive_airport") or "").strip(),
+            "arrive_at": request.form.get("arrive_at") or None,
+            "reservation_code": (request.form.get("reservation_code") or "").strip(),
+            "seat": (request.form.get("seat") or "").strip(),
+            "terminal": (request.form.get("terminal") or "").strip(),
+            "gate": (request.form.get("gate") or "").strip(),
+            "notes": (request.form.get("notes") or "").strip(),
+            "created_at": now_str(),
+        }
+        has_any = any(
+            payload.get(key)
+            for key in [
+                "airline",
+                "flight_no",
+                "depart_airport",
+                "depart_at",
+                "arrive_airport",
+                "arrive_at",
+                "reservation_code",
+                "seat",
+                "terminal",
+                "gate",
+                "notes",
+            ]
+        )
+        if has_any:
+            sb.table(FLIGHT_TABLE).insert(payload).execute()
+        return redirect(url_for("flights"))
+
+    flights_data = (
+        sb.table(FLIGHT_TABLE)
+        .select(
+            "id, airline, flight_no, depart_airport, depart_at, arrive_airport, arrive_at, "
+            "reservation_code, seat, terminal, gate, notes, created_at"
+        )
+        .eq("trip_id", trip["id"])
+        .order("depart_at", desc=False)
+        .order("id", desc=True)
+        .execute()
+        .data
+    )
+    for row in flights_data:
+        row["depart_time_label"] = format_jp_time(row.get("depart_at"))
+        row["arrive_time_label"] = format_jp_time(row.get("arrive_at"))
+        row["depart_date_label"] = format_jp_date_from_datetime(row.get("depart_at"))
+        row["duration_label"] = format_duration(row.get("depart_at"), row.get("arrive_at"))
+    return render_template(
+        "flights.html",
+        flights=flights_data,
+    )
+
+
+@app.route("/flights/<int:flight_id>/edit")
+def flights_edit(flight_id):
+    sb = get_supabase()
+    trip = get_active_trip(sb)
+    if not trip:
+        return redirect(url_for("trips"))
+    data = (
+        sb.table(FLIGHT_TABLE)
+        .select(
+            "id, airline, flight_no, depart_airport, depart_at, arrive_airport, arrive_at, "
+            "reservation_code, seat, terminal, gate, notes, created_at"
+        )
+        .eq("id", flight_id)
+        .eq("trip_id", trip["id"])
+        .execute()
+        .data
+    )
+    if not data:
+        return redirect(url_for("flights"))
+    return render_template("flights_edit.html", flight=data[0])
+
+
+@app.post("/flights/<int:flight_id>/update")
+def flights_update(flight_id):
+    sb = get_supabase()
+    trip = get_active_trip(sb)
+    if not trip:
+        return redirect(url_for("trips"))
+    payload = {
+        "airline": (request.form.get("airline") or "").strip(),
+        "flight_no": (request.form.get("flight_no") or "").strip(),
+        "depart_airport": (request.form.get("depart_airport") or "").strip(),
+        "depart_at": request.form.get("depart_at") or None,
+        "arrive_airport": (request.form.get("arrive_airport") or "").strip(),
+        "arrive_at": request.form.get("arrive_at") or None,
+        "reservation_code": (request.form.get("reservation_code") or "").strip(),
+        "seat": (request.form.get("seat") or "").strip(),
+        "terminal": (request.form.get("terminal") or "").strip(),
+        "gate": (request.form.get("gate") or "").strip(),
+        "notes": (request.form.get("notes") or "").strip(),
+    }
+    has_any = any(
+        payload.get(key)
+        for key in [
+            "airline",
+            "flight_no",
+            "depart_airport",
+            "depart_at",
+            "arrive_airport",
+            "arrive_at",
+            "reservation_code",
+            "seat",
+            "terminal",
+            "gate",
+            "notes",
+        ]
+    )
+    if has_any:
+        sb.table(FLIGHT_TABLE).update(payload).eq("id", flight_id).eq("trip_id", trip["id"]).execute()
+    return redirect(url_for("flights"))
+
+
+@app.post("/flights/<int:flight_id>/delete")
+def flights_delete(flight_id):
+    sb = get_supabase()
+    trip = get_active_trip(sb)
+    if not trip:
+        return redirect(url_for("trips"))
+    sb.table(FLIGHT_TABLE).delete().eq("id", flight_id).eq("trip_id", trip["id"]).execute()
+    return redirect(url_for("flights"))
 
 
 if __name__ == "__main__":
-    app.run(debug=True, port=5001)
+    app.run(debug=True, port=5002)
+

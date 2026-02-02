@@ -1,27 +1,27 @@
-{% extends "base.html" %}
+﻿{% extends "base.html" %}
 
 {% block content %}
   <section class="page-header">
     <div>
       <p class="eyebrow">Lottery</p>
-      <h1>くじ引き</h1>
-      <p class="lead">入力した候補からランダムで表示します。</p>
+      <h1>縺上§蠑輔″</h1>
+      <p class="lead">蜈･蜉帙＠縺溷呵｣懊°繧峨Λ繝ｳ繝繝縺ｧ陦ｨ遉ｺ縺励∪縺吶・/p>
     </div>
   </section>
 
   <section class="panel form-panel">
     <form method="post" class="form-grid">
       <div>
-        <label for="text">候補</label>
-        <input id="text" name="text" type="text" placeholder="例: ゲームA" required />
+        <label for="text">蛟呵｣・/label>
+        <input id="text" name="text" type="text" placeholder="萓・ 繧ｲ繝ｼ繝A" required />
       </div>
-      <button class="button primary" type="submit">追加する</button>
+      <button class="button primary" type="submit">霑ｽ蜉縺吶ｋ</button>
     </form>
     <div class="lottery-actions">
-      <a class="button ghost" href="{{ url_for('games_lottery', draw=1) }}">くじを引く</a>
+      <a class="button ghost" href="{{ url_for('games_lottery', draw=1) }}">縺上§繧貞ｼ輔￥</a>
       {% if result %}
         <div class="lottery-result">
-          <span>結果</span>
+          <span>邨先棡</span>
           <strong>{{ result }}</strong>
         </div>
       {% endif %}
@@ -37,11 +37,11 @@
             <span class="meta">{{ item["created_at"] }}</span>
           </div>
           <form method="post" action="{{ url_for('games_lottery_delete', item_id=item['id']) }}">
-            <button class="button danger" type="submit">削除</button>
+            <button class="button danger" type="submit">蜑企勁</button>
           </form>
         </li>
       {% else %}
-        <li class="item-row empty-state">まだ候補がありません。</li>
+        <li class="item-row empty-state">縺ｾ縺蛟呵｣懊′縺ゅｊ縺ｾ縺帙ｓ縲・/li>
       {% endfor %}
     </ul>
   </section>

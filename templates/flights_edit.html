@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <section class="page-header">
+    <div>
+      <p class="eyebrow">Edit</p>
+      <h1>フライトを編集</h1>
+      <p class="lead">便名・時刻・座席などを更新できます。</p>
+    </div>
+  </section>
+
+  <section class="panel form-panel">
+    <form method="post" action="{{ url_for('flights_update', flight_id=flight['id']) }}" class="form-grid">
+      <div>
+        <label for="airline">航空会社</label>
+        <input id="airline" name="airline" type="text" value="{{ flight['airline'] or '' }}" />
+      </div>
+      <div>
+        <label for="flight_no">便名</label>
+        <input id="flight_no" name="flight_no" type="text" value="{{ flight['flight_no'] or '' }}" />
+      </div>
+      <div>
+        <label for="depart_airport">出発空港</label>
+        <input id="depart_airport" name="depart_airport" type="text" value="{{ flight['depart_airport'] or '' }}" />
+      </div>
+      <div>
+        <label for="depart_at">出発日時</label>
+        <input id="depart_at" name="depart_at" type="datetime-local" value="{{ flight['depart_at'] or '' }}" />
+      </div>
+      <div>
+        <label for="arrive_airport">到着空港</label>
+        <input id="arrive_airport" name="arrive_airport" type="text" value="{{ flight['arrive_airport'] or '' }}" />
+      </div>
+      <div>
+        <label for="arrive_at">到着日時</label>
+        <input id="arrive_at" name="arrive_at" type="datetime-local" value="{{ flight['arrive_at'] or '' }}" />
+      </div>
+      <div>
+        <label for="reservation_code">予約番号</label>
+        <input id="reservation_code" name="reservation_code" type="text" value="{{ flight['reservation_code'] or '' }}" />
+      </div>
+      <div>
+        <label for="seat">座席</label>
+        <input id="seat" name="seat" type="text" value="{{ flight['seat'] or '' }}" />
+      </div>
+      <div>
+        <label for="terminal">ターミナル</label>
+        <input id="terminal" name="terminal" type="text" value="{{ flight['terminal'] or '' }}" />
+      </div>
+      <div>
+        <label for="gate">搭乗口</label>
+        <input id="gate" name="gate" type="text" value="{{ flight['gate'] or '' }}" />
+      </div>
+      <div>
+        <label for="notes">メモ</label>
+        <textarea id="notes" name="notes">{{ flight['notes'] or '' }}</textarea>
+      </div>
+      <div class="inline-actions">
+        <button class="button primary" type="submit">更新する</button>
+        <a class="button ghost" href="{{ url_for('flights') }}">戻る</a>
+      </div>
+    </form>
+  </section>
+{% endblock %}

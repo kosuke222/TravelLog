@@ -1,0 +1,192 @@
+{% extends "base.html" %}
+
+{% block head %}
+  {% if google_maps_api_key %}
+    <script>
+      function initHotelSearch() {
+        const run = () => {
+          const input = document.getElementById("hotel-search-input");
+          const mapEl = document.getElementById("hotel-map");
+          if (!input || !mapEl || !window.google || !google.maps || !google.maps.places) {
+            return;
+          }
+
+          const autocomplete = new google.maps.places.Autocomplete(input, {
+            fields: [
+              "place_id",
+              "name",
+              "formatted_address",
+              "geometry",
+              "url",
+              "website",
+            ],
+            types: ["lodging"],
+          });
+
+          const map = new google.maps.Map(mapEl, {
+            center: { lat: 35.6804, lng: 139.769 },
+            zoom: 12,
+          });
+
+          const marker = new google.maps.Marker({ map });
+
+          autocomplete.addListener("place_changed", () => {
+            const place = autocomplete.getPlace();
+            if (!place.geometry || !place.geometry.location) {
+              return;
+            }
+
+            map.setCenter(place.geometry.location);
+            map.setZoom(16);
+            marker.setPosition(place.geometry.location);
+
+            const name = document.getElementById("name");
+            const address = document.getElementById("address");
+            const mapUrl = document.getElementById("map_url");
+            const websiteUrl = document.getElementById("website_url");
+            if (name) name.value = place.name || "";
+            if (address) address.value = place.formatted_address || "";
+            if (mapUrl) mapUrl.value = place.url || "";
+            if (websiteUrl) websiteUrl.value = place.website || "";
+          });
+        };
+
+        if (document.readyState === "loading") {
+          document.addEventListener("DOMContentLoaded", run, { once: true });
+        } else {
+          run();
+        }
+      }
+    </script>
+    <script
+      src="https://maps.googleapis.com/maps/api/js?key={{ google_maps_api_key }}&libraries=places&callback=initHotelSearch"
+      async
+      defer
+    ></script>
+  {% endif %}
+{% endblock %}
+
+{% block content %}
+  <section class="page-header">
+    <div>
+      <p class="eyebrow">Hotels</p>
+      <h1>ホテル詳細</h1>
+      <p class="lead">ホテル名・住所・メモと写真をまとめて保存。</p>
+    </div>
+  </section>
+
+  <section class="panel form-panel is-collapsed" id="hotel-form-panel">
+    <form method="post" class="form-grid" enctype="multipart/form-data">
+      <div>
+        <label for="hotel-search-input">ホテル名検索（Google Maps）</label>
+        <input id="hotel-search-input" type="text" placeholder="例: 札幌 ○○ホテル" autocomplete="off" />
+        {% if not google_maps_api_key %}
+          <p class="meta">Google Maps APIキーが設定されていません。</p>
+        {% endif %}
+      </div>
+      <div>
+        <label for="name">ホテル名</label>
+        <input id="name" name="name" type="text" placeholder="例: ○○ホテル" />
+      </div>
+      <div>
+        <label for="address">住所</label>
+        <input id="address" name="address" type="text" placeholder="住所 or エリア" />
+      </div>
+      <div>
+        <label for="checkin_date">宿泊開始日</label>
+        <input id="checkin_date" name="checkin_date" type="date" />
+      </div>
+      <div>
+        <label for="checkout_date">宿泊終了日</label>
+        <input id="checkout_date" name="checkout_date" type="date" />
+      </div>
+      <div>
+        <label>地図プレビュー</label>
+        <div id="hotel-map" class="map-preview"></div>
+      </div>
+      <input id="map_url" name="map_url" type="hidden" />
+      <div>
+        <label for="website_url">公式サイト</label>
+        <input id="website_url" name="website_url" type="url" placeholder="ホテル公式サイト" />
+      </div>
+      <div>
+        <label for="notes">メモ</label>
+        <textarea id="notes" name="notes" placeholder="予約番号・チェックイン時刻など"></textarea>
+      </div>
+      <div>
+        <label for="photos">画像を追加</label>
+        <input id="photos" name="photos" type="file" accept="image/*" multiple />
+      </div>
+      <button class="button primary" type="submit">保存する</button>
+    </form>
+  </section>
+
+  <section class="panel">
+    <div class="panel-header">
+      <strong>登録済みホテル</strong>
+      <button class="button primary" type="button" id="hotel-form-toggle">追加フォームを開く</button>
+    </div>
+    <ul class="item-list">
+      {% for hotel in hotels %}
+        <li class="item-row">
+          <div class="item-main">
+            <strong>{{ hotel["name"] }}</strong>
+            {% if hotel["checkin_label"] or hotel["checkout_label"] %}
+              <div class="meta">
+                {{ hotel["checkin_label"] or "" }}{% if hotel["checkout_label"] %}?{{ hotel["checkout_label"] }}{% endif %}
+              </div>
+            {% endif %}
+            <div class="meta">{{ hotel["address"] }}</div>
+            {% if hotel["notes"] %}
+              <div class="note">{{ hotel["notes"] }}</div>
+            {% endif %}
+            {% set photos = photos_by_hotel.get(hotel["id"], []) %}
+            {% if photos %}
+              <div class="photo-shell">
+                <div class="photo-scroller">
+                  {% for photo in photos %}
+                    <img class="place-photo" src="{{ photo['photo_url'] }}" alt="{{ hotel['name'] }}" />
+                  {% endfor %}
+                </div>
+              </div>
+            {% endif %}
+            {% if hotel["map_url"] or hotel["website_url"] %}
+              <div class="meta inline-actions">
+                {% if hotel["map_url"] %}
+                  <a class="button ghost" href="{{ hotel['map_url'] }}" target="_blank" rel="noopener">地図を開く</a>
+                {% endif %}
+                {% if hotel["website_url"] %}
+                  <a class="button ghost" href="{{ hotel['website_url'] }}" target="_blank" rel="noopener">公式サイト</a>
+                {% endif %}
+              </div>
+            {% endif %}
+          </div>
+          <div class="item-actions">
+            <a class="button ghost" href="{{ url_for('hotels_edit', hotel_id=hotel['id']) }}">編集</a>
+            <form method="post" action="{{ url_for('hotels_delete', hotel_id=hotel['id']) }}">
+              <button class="button danger" type="submit">削除</button>
+            </form>
+          </div>
+        </li>
+      {% else %}
+        <li class="item-row empty-state">ホテルはまだありません。</li>
+      {% endfor %}
+    </ul>
+  </section>
+
+  <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      const formToggle = document.getElementById("hotel-form-toggle");
+      const formPanel = document.getElementById("hotel-form-panel");
+      if (formToggle && formPanel) {
+        formToggle.addEventListener("click", () => {
+          const isHidden = formPanel.classList.toggle("is-collapsed");
+          formToggle.textContent = isHidden ? "追加フォームを開く" : "追加フォームを閉じる";
+          if (!isHidden) {
+            formPanel.scrollIntoView({ behavior: "smooth", block: "start" });
+          }
+        });
+      }
+    });
+  </script>
+{% endblock %}

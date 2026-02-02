@@ -4,15 +4,15 @@
   <section class="page-header">
     <div>
       <p class="eyebrow">Edit</p>
-      <h1>予定を編集</h1>
-      <p class="lead">予定とプラン内容を更新できます。</p>
+      <h1>プランを編集</h1>
+      <p class="lead">タイトルやメモ、写真を更新できます。</p>
     </div>
   </section>
 
   <section class="panel form-panel">
     <form method="post" action="{{ url_for('schedule_update', schedule_id=schedule['id']) }}" class="form-grid" enctype="multipart/form-data">
       <div>
-        <label for="title">予定</label>
+        <label for="title">タイトル</label>
         <input id="title" name="title" type="text" value="{{ schedule['title'] }}" />
       </div>
       <div>
@@ -20,7 +20,15 @@
         <input id="date" name="date" type="date" value="{{ schedule['date'] or '' }}" />
       </div>
       <div>
-        <label for="detail">デートプラン詳細</label>
+        <label for="start_time">開始時刻</label>
+        <input id="start_time" name="start_time" type="time" value="{{ schedule['start_time'] or '' }}" />
+      </div>
+      <div>
+        <label for="end_time">終了時刻</label>
+        <input id="end_time" name="end_time" type="time" value="{{ schedule['end_time'] or '' }}" />
+      </div>
+      <div>
+        <label for="detail">メモ</label>
         <textarea id="detail" name="detail">{{ schedule['detail'] or '' }}</textarea>
       </div>
       <div>
@@ -28,7 +36,7 @@
         <input id="address" name="address" type="text" value="{{ schedule['address'] or '' }}" />
       </div>
       <div>
-        <label for="photos">写真（追加アップロード）</label>
+        <label for="photos">画像を追加</label>
         <input id="photos" name="photos" type="file" accept="image/*" multiple />
         {% if schedule["photo_url"] or photos %}
           <div class="photo-shell">

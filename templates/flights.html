@@ -1,0 +1,138 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <section class="page-header">
+    <div>
+      <p class="eyebrow">Flights</p>
+      <h1>フライト詳細</h1>
+      <p class="lead">便名・時刻・座席などをまとめて確認。</p>
+    </div>
+  </section>
+
+  <section class="panel form-panel is-collapsed" id="flight-form-panel">
+    <form method="post" class="form-grid">
+      <div>
+        <label for="airline">航空会社</label>
+        <input id="airline" name="airline" type="text" placeholder="例: ANA" />
+      </div>
+      <div>
+        <label for="flight_no">便名</label>
+        <input id="flight_no" name="flight_no" type="text" placeholder="例: NH123" />
+      </div>
+      <div>
+        <label for="depart_airport">出発空港</label>
+        <input id="depart_airport" name="depart_airport" type="text" placeholder="例: HND" />
+      </div>
+      <div>
+        <label for="depart_at">出発日時</label>
+        <input id="depart_at" name="depart_at" type="datetime-local" />
+      </div>
+      <div>
+        <label for="arrive_airport">到着空港</label>
+        <input id="arrive_airport" name="arrive_airport" type="text" placeholder="例: CTS" />
+      </div>
+      <div>
+        <label for="arrive_at">到着日時</label>
+        <input id="arrive_at" name="arrive_at" type="datetime-local" />
+      </div>
+      <div>
+        <label for="reservation_code">予約番号</label>
+        <input id="reservation_code" name="reservation_code" type="text" />
+      </div>
+      <div>
+        <label for="seat">座席</label>
+        <input id="seat" name="seat" type="text" placeholder="例: 12A" />
+      </div>
+      <div>
+        <label for="terminal">ターミナル</label>
+        <input id="terminal" name="terminal" type="text" />
+      </div>
+      <div>
+        <label for="gate">搭乗口</label>
+        <input id="gate" name="gate" type="text" />
+      </div>
+      <div>
+        <label for="notes">メモ</label>
+        <textarea id="notes" name="notes" placeholder="チェックイン時間、手荷物など"></textarea>
+      </div>
+      <button class="button primary" type="submit">保存する</button>
+    </form>
+  </section>
+
+  <section class="panel">
+    <div class="panel-header">
+      <strong>登録済みフライト</strong>
+      <button class="button primary" type="button" id="flight-form-toggle">追加フォームを開く</button>
+    </div>
+    <ul class="item-list">
+      {% for flight in flights %}
+        <li class="panel flight-card">
+          <div class="flight-card-header">
+            <div class="flight-date">
+              <span class="meta">{{ flight["depart_date_label"] or "日付未設定" }}</span>
+            </div>
+            <div class="item-actions">
+              <a class="button ghost" href="{{ url_for('flights_edit', flight_id=flight['id']) }}">編集</a>
+              <form method="post" action="{{ url_for('flights_delete', flight_id=flight['id']) }}">
+                <button class="button danger" type="submit">削除</button>
+              </form>
+            </div>
+          </div>
+          <div class="flight-row">
+            <div class="flight-time">{{ flight["depart_time_label"] or "--:--" }}</div>
+            <div class="flight-main">
+              <div class="flight-airport">{{ flight["depart_airport"] or "出発地未設定" }}</div>
+              <div class="flight-meta">
+                {{ flight["airline"] or "" }} {{ flight["flight_no"] or "" }}
+              </div>
+              <div class="flight-meta">
+                {% if flight["terminal"] %}{{ flight["terminal"] }}{% endif %}
+                {% if flight["gate"] %}<span class="flight-line">ゲート {{ flight["gate"] }}</span>{% endif %}
+                {% if flight["seat"] %}<span class="flight-line">座席 {{ flight["seat"] }}</span>{% endif %}
+              </div>
+            </div>
+          </div>
+          <div class="flight-divider"></div>
+          <div class="flight-row">
+            <div class="flight-time">{{ flight["arrive_time_label"] or "--:--" }}</div>
+            <div class="flight-main">
+              <div class="flight-airport">{{ flight["arrive_airport"] or "到着地未設定" }}</div>
+              <div class="flight-meta">
+                {% if flight["reservation_code"] %}予約 {{ flight["reservation_code"] }}{% endif %}
+              </div>
+            </div>
+          </div>
+          <div class="inline-actions">
+            {% if flight["depart_airport"] %}
+              <a class="button ghost" href="https://www.google.com/maps/search/?api=1&query={{ flight['depart_airport'] | urlencode }}" target="_blank" rel="noopener">出発空港を地図で</a>
+            {% endif %}
+            {% if flight["arrive_airport"] %}
+              <a class="button ghost" href="https://www.google.com/maps/search/?api=1&query={{ flight['arrive_airport'] | urlencode }}" target="_blank" rel="noopener">到着空港を地図で</a>
+            {% endif %}
+          </div>
+          {% if flight["notes"] %}
+            <div class="note">{{ flight["notes"] }}</div>
+          {% endif %}
+        </li>
+      {% else %}
+        <li class="item-row empty-state">フライトはまだありません。</li>
+      {% endfor %}
+    </ul>
+  </section>
+
+  <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      const formToggle = document.getElementById("flight-form-toggle");
+      const formPanel = document.getElementById("flight-form-panel");
+      if (formToggle && formPanel) {
+        formToggle.addEventListener("click", () => {
+          const isHidden = formPanel.classList.toggle("is-collapsed");
+          formToggle.textContent = isHidden ? "追加フォームを開く" : "追加フォームを閉じる";
+          if (!isHidden) {
+            formPanel.scrollIntoView({ behavior: "smooth", block: "start" });
+          }
+        });
+      }
+    });
+  </script>
+{% endblock %}

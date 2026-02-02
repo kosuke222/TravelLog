@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <section class="page-header">
+    <div>
+      <p class="eyebrow">Trips</p>
+      <h1>旅行を選択</h1>
+      <p class="lead">一度選択すると、次回以降はその旅行からスタートします。</p>
+    </div>
+    <form method="post" action="{{ url_for('trips_clear') }}">
+      <button class="button ghost" type="submit">選択を解除</button>
+    </form>
+  </section>
+
+  <section class="panel form-panel">
+    <div class="panel-header">
+      <strong>新しい旅行を追加</strong>
+    </div>
+    <form method="post" class="form-grid">
+      <div>
+        <label for="name">旅行名</label>
+        <input id="name" name="name" type="text" placeholder="例: 2026 春の北海道" />
+      </div>
+      <div>
+        <label for="start_date">開始日</label>
+        <input id="start_date" name="start_date" type="date" />
+      </div>
+      <div>
+        <label for="end_date">終了日</label>
+        <input id="end_date" name="end_date" type="date" />
+      </div>
+      <div>
+        <label for="note">メモ</label>
+        <textarea id="note" name="note" placeholder="同行者や目的など"></textarea>
+      </div>
+      <button class="button primary" type="submit">追加して選択</button>
+    </form>
+  </section>
+
+  <section class="panel">
+    <div class="panel-header">
+      <strong>旅行一覧</strong>
+    </div>
+    <ul class="item-list">
+      {% for trip in trips %}
+        <li class="item-row">
+          <div class="item-main">
+            <strong>{{ trip["name"] }}</strong>
+            <div class="meta">
+              {% if trip["start_date"] %}{{ trip["start_date"] }}{% endif %}
+              {% if trip["end_date"] %}?{{ trip["end_date"] }}{% endif %}
+            </div>
+            {% if trip["note"] %}
+              <div class="note">{{ trip["note"] }}</div>
+            {% endif %}
+          </div>
+          <div class="item-actions">
+            <form method="post" action="{{ url_for('trips_select') }}">
+              <input type="hidden" name="trip_id" value="{{ trip['id'] }}" />
+              <button class="button primary" type="submit">
+                {% if selected_trip_id == trip['id'] %}選択中{% else %}この旅行を開く{% endif %}
+              </button>
+            </form>
+          </div>
+        </li>
+      {% else %}
+        <li class="item-row empty-state">旅行がまだありません。</li>
+      {% endfor %}
+    </ul>
+  </section>
+{% endblock %}

@@ -203,7 +203,7 @@
     <div>
       <p class="eyebrow">Places</p>
       <h1>行きたいところリスト</h1>
-      <p class="lead">Googleマップから検索して、そのまま保存できます。</p>
+      <p class="lead">Google Maps から検索して保存できます。</p>
     </div>
   </section>
 
@@ -218,7 +218,7 @@
     <div class="form-grid">
       <div>
         <label for="place-search-list">リスト内検索</label>
-        <input id="place-search-list" type="search" placeholder="駅名・店名・住所で検索" />
+        <input id="place-search-list" type="search" placeholder="スポット名・住所で検索" />
       </div>
     </div>
   </section>
@@ -226,10 +226,10 @@
   <section class="panel form-panel is-collapsed" id="place-form-panel">
     <form method="post" class="form-grid" enctype="multipart/form-data" id="place-form">
       <div>
-        <label for="place-search-input">場所を検索</label>
-        <input id="place-search-input" type="text" placeholder="例: 渋谷カフェ" autocomplete="off" />
+        <label for="place-search-input">Google Maps 検索</label>
+        <input id="place-search-input" type="text" placeholder="例: 札幌 カフェ" autocomplete="off" />
         {% if not google_maps_api_key %}
-          <p class="meta">Google Maps APIキーが未設定です。</p>
+          <p class="meta">Google Maps APIキーが設定されていません。</p>
         {% endif %}
       </div>
       <div>
@@ -250,10 +250,10 @@
       </div>
       <div>
         <label for="notes">メモ</label>
-        <textarea id="notes" name="notes" placeholder="雰囲気、予算、行きたい理由など"></textarea>
+        <textarea id="notes" name="notes" placeholder="行きたい理由・メモなど"></textarea>
       </div>
       <div>
-        <label>マッププレビュー</label>
+        <label>地図プレビュー</label>
         <div id="place-map" class="map-preview"></div>
       </div>
       <div>
@@ -267,7 +267,7 @@
         </div>
       </div>
       <div>
-        <label for="photos">写真（追加アップロード）</label>
+        <label for="photos">画像を追加</label>
         <input id="photos" name="photos" type="file" accept="image/*" multiple />
       </div>
 
@@ -284,7 +284,7 @@
       <input type="hidden" id="google_url" name="google_url" />
       <input type="hidden" id="opening_hours" name="opening_hours" />
 
-      <button class="button primary" type="submit">追加する</button>
+      <button class="button primary" type="submit">保存する</button>
     </form>
   </section>
 
@@ -296,7 +296,7 @@
     <ul class="item-list">
       <li id="place-map-panel" class="map-panel">
         <div class="map-header">
-          <strong>マップ</strong>
+          <strong>地図</strong>
           <button class="button ghost map-close" type="button" id="place-map-close">閉じる</button>
         </div>
         <div id="places-map" class="map-preview"></div>
@@ -317,7 +317,7 @@
               <div class="meta">{{ place["address"] }}</div>
             {% endif %}
             {% if place["rating"] %}
-              <div class="meta">評価 {{ place["rating"] }}（{{ place["user_ratings_total"] or 0 }}）</div>
+              <div class="meta">評価 {{ place["rating"] }}（{{ place["user_ratings_total"] or 0 }}件）</div>
             {% endif %}
             {% if place["opening_hours"] %}
               <button type="button" class="button ghost hours-toggle">営業時間を見る</button>
@@ -364,7 +364,7 @@
           </div>
         </li>
       {% else %}
-        <li class="item-row empty-state">まだ登録がありません。</li>
+        <li class="item-row empty-state">行きたい場所がまだありません。</li>
       {% endfor %}
     </ul>
   </section>
@@ -372,7 +372,7 @@
   <div id="photo-modal" class="photo-modal is-hidden" role="dialog" aria-modal="true">
     <div class="photo-modal-card">
       <div class="photo-modal-header">
-        <strong>写真一覧</strong>
+        <strong>写真</strong>
         <button type="button" class="button ghost" id="photo-modal-close">閉じる</button>
       </div>
       <div class="photo-modal-body photo-shell">
@@ -434,7 +434,7 @@
             const img = document.createElement("img");
             img.className = "place-photo preview";
             img.src = url;
-            img.alt = "プレビュー";
+            img.alt = "写真";
             modalScroller.appendChild(img);
           });
           if (deleteForm) {

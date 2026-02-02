@@ -75,6 +75,30 @@ body {
   width: 100%;
 }
 
+.trip-badge {
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.8);
+  border: 1px solid var(--outline);
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--muted);
+  text-decoration: none;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.trip-badge:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 16px rgba(31, 31, 31, 0.12);
+}
+
+.header-actions {
+  margin-top: 10px;
+  display: flex;
+  justify-content: center;
+  width: 100%;
+}
+
 .image-next,
 .image-reveal {
   border-radius: 999px;
@@ -324,6 +348,11 @@ body {
   transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
+.button.is-disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 .button:hover {
   transform: translateY(-2px);
   box-shadow: 0 10px 20px rgba(31, 31, 31, 0.15);
@@ -528,6 +557,10 @@ body {
   background: #fff;
 }
 
+.form-grid input[type="date"] {
+  font-size: 0.85rem;
+}
+
 .form-grid textarea {
   min-height: 140px;
   resize: vertical;
@@ -613,7 +646,7 @@ body {
 .schedule-day {
   display: grid;
   gap: 10px;
-  padding: 6px;
+  padding: 0;
   border-radius: 16px;
   background: rgba(255, 255, 255, 0.75);
   border: 1px solid rgba(203, 178, 122, 0.5);
@@ -624,6 +657,7 @@ body {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+  padding: 0 4px;
 }
 
 .schedule-day-date {
@@ -634,6 +668,19 @@ body {
 .schedule-day-count {
   font-size: 0.85rem;
   color: var(--muted);
+}
+
+.schedule-day-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.schedule-day-add {
+  padding: 4px 10px;
+  min-height: 32px;
+  min-width: 32px;
+  line-height: 1;
 }
 
 .schedule-day-cards {
@@ -649,6 +696,98 @@ body {
   flex: 0 0 min(560px, 92vw);
   width: min(560px, 92vw);
   scroll-snap-align: start;
+}
+
+.schedule-list {
+  display: grid;
+  gap: 12px;
+  width: 100%;
+}
+
+.schedule-item {
+  display: grid;
+  grid-template-columns: 26px 1fr;
+  gap: 12px;
+  padding: 8px 8px 8px 6px;
+  border-radius: 14px;
+  border: 1px dashed rgba(203, 178, 122, 0.6);
+  background: rgba(255, 255, 255, 0.7);
+  max-width: 100%;
+  overflow: visible;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.schedule-marker {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-start;
+}
+
+.schedule-index {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: #2d6fb1;
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  font-weight: 700;
+  box-shadow: 0 6px 12px rgba(45, 111, 177, 0.25);
+  z-index: 1;
+}
+
+.schedule-line {
+  display: none;
+}
+
+.schedule-list .schedule-item + .schedule-item {
+  position: relative;
+}
+
+.schedule-list .schedule-item + .schedule-item::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -6px;
+  height: 1px;
+  border-top: 1px dashed rgba(203, 178, 122, 0.6);
+}
+
+.schedule-content {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.schedule-details {
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.schedule-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  cursor: pointer;
+}
+
+.schedule-title {
+  font-size: 1rem;
+  min-width: 0;
+}
+
+.schedule-time {
+  font-weight: 700;
+  color: var(--accent-deep);
+  font-size: 0.9rem;
 }
 
 .item-row {
@@ -688,6 +827,7 @@ body {
   display: flex;
   gap: 10px;
   align-items: center;
+  flex-wrap: wrap;
 }
 
 .item-actions form {
@@ -716,6 +856,10 @@ body {
   align-items: center;
   scroll-snap-type: x mandatory;
   width: max-content;
+}
+
+.schedule-details .photo-shell {
+  overflow-x: auto;
 }
 
 .photo-shell::-webkit-scrollbar {
@@ -1027,6 +1171,73 @@ body {
 
 .filter-row label {
   font-weight: 600;
+}
+
+.flight-card {
+  display: grid;
+  gap: 12px;
+  padding: 18px;
+}
+
+.flight-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.flight-date {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.flight-row {
+  display: grid;
+  grid-template-columns: 72px 1fr;
+  gap: 12px;
+  align-items: start;
+}
+
+.flight-time {
+  font-weight: 700;
+  font-size: 1.1rem;
+  color: var(--ink);
+}
+
+.flight-main {
+  display: grid;
+  gap: 6px;
+}
+
+.flight-meta {
+  display: grid;
+  gap: 6px;
+}
+
+.flight-line {
+  display: block;
+}
+
+.flight-airport {
+  font-weight: 700;
+  font-size: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.flight-airport::after {
+  content: "›";
+  color: var(--accent-deep);
+  font-weight: 700;
+}
+
+.flight-divider {
+  height: 1px;
+  background: rgba(203, 178, 122, 0.6);
+  margin-left: 72px;
 }
 
 @media (max-width: 720px) {
